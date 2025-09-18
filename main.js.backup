@@ -1,0 +1,1416 @@
+import { Telegraf, Markup } from "telegraf";
+import { config } from "dotenv";
+import pkg from "pg";
+import fetch from 'node-fetch'; // npm install node-fetch
+
+// Environment variables ni yuklash
+config();
+
+const { Pool } = pkg;
+const bot = new Telegraf(process.env.BOT_TOKEN);
+const adminId = parseInt(process.env.ADMIN_ID); // parseInt qilish muhim
+
+// 📂 PostgreSQL ulanish
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASS,
+  port: parseInt(process.env.DB_PORT) || 5432,
+});
+
+// Database ulanishini tekshirish
+pool.connect()
+  .then(() => console.log('✅ Database ga muvaffaqiyatli ulanildi'))
+  .catch(err => console.error('❌ Database ulanish xatosi:', err));
+
+// 🌍 MULTIPLE TARJIMA API'LARI (eng yaxshisini tanlash)
+// 🌍 ENG MUKAMMAL TARJIMA FUNKSIYASI
+async function translateText(text, fromLang, toLang) {
+  // Agar matn bo'sh yoki bir xil til bo'lsa
+  if (!text || !text.trim() || fromLang === toLang) {
+    return text;
+  }
+
+  // Agar matn juda qisqa bo'lsa (1-2 harf)
+  if (text.trim().length <= 2) {
+    return text;
+  }
+
+  console.log(`🔄 Tarjima: "${text}" (${fromLang} -> ${toLang})`);
+
+  // Tarjima servislarini tartib bo'yicha sinab ko'ramiz
+  const translationServices = [
+    
+    // 1. MyMemory API (eng ishonchli va bepul)
+    async () => {
+      try {
+        const langPair = `${fromLang}|${toLang}`;
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; TranslateBot/1.0)'
+          },
+          timeout: 5000
+        });
+        
+        if (!response.ok) throw new Error('MyMemory API failed');
+        
+        const data = await response.json();
+        
+        if (data.responseStatus === 200 && data.responseData) {
+          const translated = data.responseData.translatedText;
+          // Agar tarjima asl matndan farq qilsa
+          if (translated && translated.trim() !== text.trim()) {
+            console.log(`✅ MyMemory: "${translated}"`);
+            return translated;
+          }
+        }
+        throw new Error('Invalid translation');
+      } catch (error) {
+        console.log('❌ MyMemory failed:', error.message);
+        return null;
+      }
+    },
+
+    // 2. LibreTranslate API
+    async () => {
+      try {
+        const response = await fetch('https://translate.argosopentech.com/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+          },
+          body: JSON.stringify({
+            q: text,
+            source: fromLang === 'uz' ? 'auto' : fromLang,
+            target: toLang === 'uz' ? 'ru' : toLang,
+            format: 'text'
+          }),
+          timeout: 5000
+        });
+
+        if (!response.ok) throw new Error('LibreTranslate failed');
+
+        const data = await response.json();
+        
+        if (data.translatedText && data.translatedText.trim() !== text.trim()) {
+          console.log(`✅ LibreTranslate: "${data.translatedText}"`);
+          return data.translatedText;
+        }
+        throw new Error('Invalid translation');
+      } catch (error) {
+        console.log('❌ LibreTranslate failed:', error.message);
+        return null;
+      }
+    },
+
+    // 3. Google Translate API (Lingva proxy)
+    async () => {
+      try {
+        const sourceLang = fromLang === 'uz' ? 'auto' : fromLang;
+        const targetLang = toLang === 'uz' ? 'tg' : toLang;
+        
+        const url = `https://lingva.ml/api/v1/${sourceLang}/${targetLang}/${encodeURIComponent(text)}`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json'
+          },
+          timeout: 5000
+        });
+
+        if (!response.ok) throw new Error('Lingva failed');
+
+        const data = await response.json();
+        
+        if (data.translation && data.translation.trim() !== text.trim()) {
+          console.log(`✅ Lingva: "${data.translation}"`);
+          return data.translation;
+        }
+        throw new Error('Invalid translation');
+      } catch (error) {
+        console.log('❌ Lingva failed:', error.message);
+        return null;
+      }
+    },
+
+    // 4. Yandex Translate (demo key)
+    async () => {
+      try {
+        const langPair = fromLang === 'uz' ? 'ru' : fromLang + '-' + (toLang === 'uz' ? 'ru' : toLang);
+        const url = `https://translate.yandex.net/api/v1.5/tr.json/translate?key=trnsl.1.1.20180625T101010Z.demo&text=${encodeURIComponent(text)}&lang=${langPair}`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0'
+          },
+          timeout: 5000
+        });
+
+        if (!response.ok) throw new Error('Yandex failed');
+
+        const data = await response.json();
+        
+        if (data.code === 200 && data.text && data.text[0] && data.text[0].trim() !== text.trim()) {
+          console.log(`✅ Yandex: "${data.text[0]}"`);
+          return data.text[0];
+        }
+        throw new Error('Invalid translation');
+      } catch (error) {
+        console.log('❌ Yandex failed:', error.message);
+        return null;
+      }
+    },
+
+    // 5. Manual tarjima (mahalliy lug'at)
+    async () => {
+      const result = manualTranslate(text, fromLang, toLang);
+      if (result && result !== text) {
+        console.log(`✅ Manual: "${result}"`);
+        return result;
+      }
+      return null;
+    }
+  ];
+
+  // Har bir servisni ketma-ket sinab ko'ramiz
+  for (let i = 0; i < translationServices.length; i++) {
+    try {
+      console.log(`🔍 Servis ${i + 1} sinab ko'rilmoqda...`);
+      
+      const result = await Promise.race([
+        translationServices[i](),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 8000)
+        )
+      ]);
+
+      if (result && result.trim() && result.trim() !== text.trim()) {
+        // HTML entities va keraksiz belgilarni tozalash
+        const cleanedResult = result
+          .replace(/&#39;/g, "'")
+          .replace(/&#10;/g, "\n")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        console.log(`🎉 Muvaffaqiyatli tarjima: "${cleanedResult}"`);
+        return cleanedResult;
+      }
+    } catch (error) {
+      console.error(`❌ Servis ${i + 1} xatosi:`, error.message);
+      continue;
+    }
+  }
+
+  // Agar hech qaysi servis ishlamasa, asl matnni qaytaramiz
+  console.log('⚠️ Hech qaysi tarjima servisi ishlamadi, asl matn qaytarildi');
+  return text;
+}
+
+// Mahalliy tarjima funksiyasi (qurilish terminlari)
+function manualTranslate(text, fromLang, toLang) {
+  const translations = {
+    // Rus -> O'zbek
+    'ru-uz': {
+      'праймер': 'primer',
+      'грунтовка': 'asos qoplama',
+      'обработка': 'ishlov berish',
+      'бетонных': 'beton',
+      'деревянных': "yog'och",
+      'металлических': 'metall',
+      'поверхностей': 'sirtlar',
+      'улучшения': 'yaxshilash',
+      'качества': 'sifat',
+      'приклеивания': 'yopishtirish',
+      'наплавляемых': 'eritiladigan',
+      'кровельных': 'tom qoplama',
+      'гидроизоляционных': 'gidroizolyatsiya',
+      'материалов': 'materiallar',
+      'перед': 'oldidan',
+      'нанесением': "qo'llash",
+      'битумных': 'bitum',
+      'мастик': 'mastika',
+      'клеев': 'yelim',
+      'объём': 'hajmi',
+      'литр': 'litr',
+      'время': 'vaqt',
+      'высыхания': 'quritish',
+      'средний': "o'rtacha",
+      'расход': 'sarfiyot',
+      'производство': 'ishlab chiqarish',
+      'россия': 'rossiya',
+      'строительство': 'qurilish',
+      'ремонт': "ta'mirlash"
+    },
+    
+    // O'zbek -> Rus  
+    'uz-ru': {
+      'primer': 'праймер',
+      'asos qoplama': 'грунтовка',
+      'ishlov berish': 'обработка',
+      'beton': 'бетонный',
+      "yog'och": 'деревянный',
+      'metall': 'металлический',
+      'sirtlar': 'поверхности',
+      'yaxshilash': 'улучшение',
+      'sifat': 'качество',
+      'yopishtirish': 'приклеивание',
+      'eritiladigan': 'наплавляемый',
+      'tom qoplama': 'кровельный',
+      'gidroizolyatsiya': 'гидроизоляционный',
+      'materiallar': 'материалы',
+      'oldiran': 'перед',
+      "qo'llash": 'нанесение',
+      'bitum': 'битумный',
+      'mastika': 'мастика',
+      'yelim': 'клей',
+      'hajmi': 'объём',
+      'litr': 'литр',
+      'vaqt': 'время',
+      'quritish': 'высыхание',
+      "o'rtacha": 'средний',
+      'sarfiyot': 'расход',
+      'ishlab chiqarish': 'производство',
+      'rossiya': 'Россия',
+      'qurilish': 'строительство',
+      "ta'mirlash": 'ремонт'
+    }
+  };
+
+  const dictKey = `${fromLang}-${toLang}`;
+  const dict = translations[dictKey];
+  
+  if (!dict) return text;
+
+  let translatedText = text.toLowerCase();
+  let hasTranslation = false;
+  
+  // Har bir so'zni tarjima qilish
+  Object.entries(dict).forEach(([source, target]) => {
+    const regex = new RegExp(`\\b${source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+    if (regex.test(translatedText)) {
+      translatedText = translatedText.replace(regex, target);
+      hasTranslation = true;
+    }
+  });
+
+  if (!hasTranslation) return null;
+
+  // Birinchi harfni katta qilish
+  return translatedText.charAt(0).toUpperCase() + translatedText.slice(1);
+}
+
+// Tilni aniqlash funksiyasi (yaxshilangan)
+function detectLanguage(text) {
+  // Kirill harflari (rus tili)
+  const cyrillicPattern = /[\u0400-\u04FF]/;
+  
+  // O'zbek tilida ko'p uchraydigan harflar
+  const uzbekPattern = /[oʻgʼ]|sh|ch|ng|oʻz|uz|qil|ber|bor/i;
+  
+  // Rus tilida ko'p uchraydigan so'zlar
+  const russianWords = /\b(и|в|не|на|с|что|как|по|для|от|это|вы|мы|они|или|но|если|где|когда|может|может быть|должен|нужно|можно)\b/i;
+  
+  if (cyrillicPattern.test(text) || russianWords.test(text)) {
+    return 'ru';
+  }
+  
+  if (uzbekPattern.test(text)) {
+    return 'uz';
+  }
+  
+  // Default o'zbek
+  return 'uz';
+}
+
+// 🔑 DB funksiyalar (yangilangan - video support bilan)
+async function addCategory(nameUz, nameRu) {
+  try {
+    const res = await pool.query(
+      "INSERT INTO categories (name_uz, name_ru) VALUES ($1, $2) RETURNING *",
+      [nameUz, nameRu]
+    );
+    return res.rows[0];
+  } catch (error) {
+    console.error('Kategoriya qo\'shishda xato:', error);
+    throw error;
+  }
+}
+
+async function getCategories() {
+  try {
+    const res = await pool.query("SELECT * FROM categories ORDER BY id DESC");
+    return res.rows;
+  } catch (error) {
+    console.error('Kategoriyalarni olishda xato:', error);
+    throw error;
+  }
+}
+
+async function getCategoryById(id) {
+  try {
+    const res = await pool.query("SELECT * FROM categories WHERE id = $1", [id]);
+    return res.rows[0];
+  } catch (error) {
+    console.error('Kategoriyani ID bo\'yicha olishda xato:', error);
+    throw error;
+  }
+}
+
+// Yangi mahsulot qo'shish - photo yoki video bilan
+async function addProduct(categoryId, nameUz, nameRu, descriptionUz, descriptionRu, mediaId, mediaType = 'photo') {
+  try {
+    const res = await pool.query(
+      "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru, photo_id, video_id, media_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+      [categoryId, nameUz, nameRu, descriptionUz, descriptionRu, 
+       mediaType === 'photo' ? mediaId : null, 
+       mediaType === 'video' ? mediaId : null,
+       mediaType]
+    );
+    return res.rows[0];
+  } catch (error) {
+    console.error('Mahsulot qo\'shishda xato:', error);
+    throw error;
+  }
+}
+
+async function getProductsByCategory(categoryId) {
+  try {
+    const res = await pool.query(
+      "SELECT * FROM products WHERE category_id = $1 ORDER BY id DESC",
+      [categoryId]
+    );
+    return res.rows;
+  } catch (error) {
+    console.error('Mahsulotlarni olishda xato:', error);
+    throw error;
+  }
+}
+
+async function getProductById(id) {
+  try {
+    const res = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+    return res.rows[0];
+  } catch (error) {
+    console.error('Mahsulotni ID bo\'yicha olishda xato:', error);
+    throw error;
+  }
+}
+
+async function updateCategory(id, newNameUz, newNameRu) {
+  try {
+    await pool.query("UPDATE categories SET name_uz=$1, name_ru=$2 WHERE id=$3", [newNameUz, newNameRu, id]);
+  } catch (error) {
+    console.error('Kategoriyani yangilashda xato:', error);
+    throw error;
+  }
+}
+
+async function deleteCategory(id) {
+  try {
+    // Avval kategoriyaga tegishli mahsulotlarni o'chirish
+    await pool.query("DELETE FROM products WHERE category_id=$1", [id]);
+    // Keyin kategoriyani o'chirish
+    await pool.query("DELETE FROM categories WHERE id=$1", [id]);
+  } catch (error) {
+    console.error('Kategoriyani o\'chirishda xato:', error);
+    throw error;
+  }
+}
+
+async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
+  try {
+    await pool.query("UPDATE products SET name_uz=$1, name_ru=$2, description_uz=$3, description_ru=$4 WHERE id=$5", 
+      [nameUz, nameRu, descriptionUz, descriptionRu, id]);
+  } catch (error) {
+    console.error('Mahsulotni yangilashda xato:', error);
+    throw error;
+  }
+}
+
+// Media yangilash (photo yoki video)
+async function updateProductMedia(id, newMediaId, mediaType) {
+  try {
+    if (mediaType === 'photo') {
+      await pool.query("UPDATE products SET photo_id=$1, video_id=NULL, media_type='photo' WHERE id=$2", [newMediaId, id]);
+    } else if (mediaType === 'video') {
+      await pool.query("UPDATE products SET video_id=$1, photo_id=NULL, media_type='video' WHERE id=$2", [newMediaId, id]);
+    }
+  } catch (error) {
+    console.error('Mahsulot mediasini yangilashda xato:', error);
+    throw error;
+  }
+}
+
+async function deleteProduct(id) {
+  try {
+    await pool.query("DELETE FROM products WHERE id=$1", [id]);
+  } catch (error) {
+    console.error('Mahsulotni o\'chirishda xato:', error);
+    throw error;
+  }
+}
+
+// 🌐 Foydalanuvchi tilini saqlash
+const userLang = {}; // { chatId: "uz"|"ru" }
+const session = {}; // { chatId: { step, categoryId, productId, data } }
+
+// Admin tekshirish funksiyasi
+function isAdmin(userId) {
+  console.log(`Tekshirilayotgan ID: ${userId}, Admin ID: ${adminId}, Turi: ${typeof userId}, Admin turi: ${typeof adminId}`);
+  return parseInt(userId) === adminId;
+}
+
+// Matnlarni tilga qarab qaytarish funksiyasi
+function getText(lang, key) {
+  const texts = {
+    choose_language: {
+      uz: "🌐 Tilni tanlang:",
+      ru: "🌐 Выберите язык:"
+    },
+    language_selected: {
+      uz: "✅ O'zbek tili tanlandi",
+      ru: "✅ Русский язык выбран"
+    },
+    admin_panel: {
+      uz: "👨‍💼 Admin paneli:",
+      ru: "👨‍💼 Панель администратора:"
+    },
+    not_admin: {
+      uz: "❌ Siz admin emassiz!",
+      ru: "❌ Вы не администратор!"
+    },
+    enter_category_name: {
+      uz: "📁 Kategoriya nomini kiriting:",
+      ru: "📁 Введите название категории:"
+    },
+    enter_product_name: {
+      uz: "🏷 Mahsulot nomini kiriting:",
+      ru: "🏷 Введите название продукта:"
+    },
+    enter_product_description: {
+      uz: "📝 Mahsulot tavsifini kiriting:",
+      ru: "📝 Введите описание продукта:"
+    },
+    send_photo_or_video: {
+      uz: "📷📹 Mahsulot rasmi yoki videosini yuboring:",
+      ru: "📷📹 Отправьте фото или видео продукта:"
+    },
+    send_photo: {
+      uz: "📷 Mahsulot rasmini yuboring:",
+      ru: "📷 Отправьте фото продукта:"
+    },
+    product_saved: {
+      uz: "✅ Mahsulot saqlandi va tarjima qilindi!",
+      ru: "✅ Продукт сохранен и переведен!"
+    },
+    category_saved: {
+      uz: "✅ Kategoriya saqlandi va tarjima qilindi!",
+      ru: "✅ Категория сохранена и переведена!"
+    },
+    translating: {
+      uz: "🔄 Tarjima qilinmoqda...",
+      ru: "🔄 Идет перевод..."
+    },
+    no_categories: {
+      uz: "🚫 Kategoriyalar topilmadi",
+      ru: "🚫 Категории не найдены"
+    },
+    select_category: {
+      uz: "📂 Kategoriyani tanlang:",
+      ru: "📂 Выберите категорию:"
+    },
+    category_updated: {
+      uz: "✅ Kategoriya yangilandi va tarjima qilindi!",
+      ru: "✅ Категория обновлена и переведена!"
+    },
+    category_deleted: {
+      uz: "✅ Kategoriya o'chirildi!",
+      ru: "✅ Категория удалена!"
+    },
+    select_product: {
+      uz: "🛍 Mahsulotni tanlang:",
+      ru: "🛍 Выберите продукт:"
+    },
+    no_products: {
+      uz: "🚫 Bu kategoriyada mahsulotlar yo'q",
+      ru: "🚫 В этой категории нет продуктов"
+    },
+    product_updated: {
+      uz: "✅ Mahsulot yangilandi va tarjima qilindi!",
+      ru: "✅ Продукт обновлен и переведен!"
+    },
+    product_deleted: {
+      uz: "✅ Mahsulot o'chirildi!",
+      ru: "✅ Продукт удален!"
+    },
+    media_updated: {
+      uz: "✅ Media yangilandi!",
+      ru: "✅ Медиа обновлено!"
+    },
+    enter_new_name: {
+      uz: "✏️ Yangi nom kiriting:",
+      ru: "✏️ Введите новое название:"
+    },
+    enter_new_description: {
+      uz: "✏️ Yangi tavsif kiriting:",
+      ru: "✏️ Введите новое описание:"
+    },
+    main_menu: {
+      uz: "🏠 Asosiy menyu:",
+      ru: "🏠 Главное меню:"
+    },
+    company_info: {
+      uz: "🏢 IZOLUX KOMPANIYASI HAQIDA\n\n📍 Manzil: Toshkent shahar\n📞 Telefon: +998 90 123 45 67\n📞 Admin: @muzropov_d\n\n✨ Bizning kompaniya yuqori sifatli izolyatsiya materiallari bilan ta'minlaydi.",
+      ru: "🏢 О КОМПАНИИ IZOLUX\n\n📍 Адрес: г. Ташкент\n📞 Телефон: +998 90 123 45 67\n📞 Admin: @muzropov_d\n\n✨ Наша компания обеспечивает высококачественными изоляционными материалами."
+    },
+    contact_info: {
+      uz: "📞 ALOQA MA'LUMOTLARI\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Manzil: Toshkent shahar, Chilonzor tumani\n🕒 Ish vaqti: 9:00 - 18:00\n\n💬 Telegram: @izolux_admin",
+      ru: "📞 КОНТАКТНАЯ ИНФОРМАЦИЯ\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Адрес: г. Ташкент, Чиланзарский район\n🕒 Время работы: 9:00 - 18:00\n\n💬 Telegram: @izolux_admin"
+    },
+    add_category: {
+      uz: "➕ Kategoriya qo'shish",
+      ru: "➕ Добавить категорию"
+    },
+    add_product: {
+      uz: "🛍 Mahsulot qo'shish",
+      ru: "🛍 Добавить продукт"
+    },
+    edit_menu: {
+      uz: "✏️ Tahrirlash",
+      ru: "✏️ Редактировать"
+    },
+    delete_menu: {
+      uz: "🗑 O'chirish",
+      ru: "🗑 Удалить"
+    },
+    back: {
+      uz: "🔙 Orqaga",
+      ru: "🔙 Назад"
+    },
+    catalog: {
+      uz: "🛒 Katalog",
+      ru: "🛒 Каталог"
+    },
+    info: {
+      uz: "ℹ️ Ma'lumot",
+      ru: "ℹ️ О компании"
+    },
+    contact: {
+      uz: "📞 Aloqa",
+      ru: "📞 Контакты"
+    },
+    edit_category: {
+      uz: "📂 Kategoriya tahrirlash",
+      ru: "📂 Редактировать категорию"
+    },
+    edit_product: {
+      uz: "📝 Mahsulot tahrirlash",
+      ru: "📝 Редактировать продукт"
+    },
+    edit_media: {
+      uz: "🖼📹 Media tahrirlash",
+      ru: "🖼📹 Редактировать медиа"
+    },
+    delete_category: {
+      uz: "🗑 Kategoriya o'chirish",
+      ru: "🗑 Удалить категорию"
+    },
+    delete_product: {
+      uz: "🗑 Mahsulot o'chirish",
+      ru: "🗑 Удалить продукт"
+    },
+    what_edit: {
+      uz: "✏️ Nimani tahrirlaysiz?",
+      ru: "✏️ Что редактируем?"
+    },
+    what_delete: {
+      uz: "🗑 Nimani o'chirasiz?",
+      ru: "🗑 Что удаляем?"
+    }
+  };
+  
+  return texts[key] ? texts[key][lang] || texts[key]['uz'] : key;
+}
+
+// Asosiy menyuni ko'rsatish
+function getMainMenu(lang) {
+  return Markup.keyboard([
+    [getText(lang, 'catalog')],
+    [getText(lang, 'info'), getText(lang, 'contact')]
+  ]).resize();
+}
+
+// Admin menyusi
+function getAdminMenu(lang) {
+  return Markup.keyboard([
+    [getText(lang, 'add_category'), getText(lang, 'add_product')],
+    [getText(lang, 'edit_menu'), getText(lang, 'delete_menu')],  
+    [getText(lang, 'back')]
+  ]).resize();
+}
+
+// Tahrirlash menyusi
+function getEditMenu(lang) {
+  return Markup.keyboard([
+    [getText(lang, 'edit_category')],
+    [getText(lang, 'edit_product')],
+    [getText(lang, 'edit_media')],
+    [getText(lang, 'back')]
+  ]).resize();
+}
+
+// O'chirish menyusi
+function getDeleteMenu(lang) {
+  return Markup.keyboard([
+    [getText(lang, 'delete_category')],
+    [getText(lang, 'delete_product')],
+    [getText(lang, 'back')]
+  ]).resize();
+}
+
+// ================= BOT ISHGA TUSHIRISH =================
+console.log('🚀 Bot ishga tushmoqda...');
+console.log(`Admin ID: ${adminId} (${typeof adminId})`);
+
+// ================= TIL TANLASH =================
+bot.start((ctx) => {
+  const lang = userLang[ctx.chat.id] || 'uz';
+  ctx.reply(
+    getText(lang, 'choose_language'),
+    Markup.inlineKeyboard([
+      [Markup.button.callback("🇺🇿 O'zbek tili", "lang_uz")],
+      [Markup.button.callback("🇷🇺 Русский язык", "lang_ru")],
+    ])
+  );
+});
+
+bot.action("lang_uz", async (ctx) => {
+  userLang[ctx.chat.id] = "uz";
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(getText('uz', 'language_selected'));
+  
+  // Asosiy menyuni ko'rsatish
+  setTimeout(() => {
+    ctx.reply(getText('uz', 'main_menu'), getMainMenu('uz'));
+  }, 500);
+});
+
+bot.action("lang_ru", async (ctx) => {
+  userLang[ctx.chat.id] = "ru";
+  await ctx.answerCbQuery(); 
+  await ctx.editMessageText(getText('ru', 'language_selected'));
+  
+  // Asosiy menyuni ko'rsatish
+  setTimeout(() => {
+    ctx.reply(getText('ru', 'main_menu'), getMainMenu('ru'));
+  }, 500);
+});
+
+// ================= ADMIN PANEL =================
+bot.command("admin", async (ctx) => {
+  console.log(`Admin buyrug'i: User ID: ${ctx.from.id}, Admin: ${isAdmin(ctx.from.id)}`);
+  
+  if (!isAdmin(ctx.from.id)) {
+    const lang = userLang[ctx.chat.id] || "uz";
+    return ctx.reply(getText(lang, 'not_admin'));
+  }
+  
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.reply(getText(lang, 'admin_panel'), getAdminMenu(lang));
+});
+
+// ================= ASOSIY MENYU =================
+// Ma'lumot
+bot.hears([/Ma'lumot/i, /О компании/i, /ℹ️ Ma'lumot/i, /ℹ️ О компании/i], async (ctx) => {
+  const lang = userLang[ctx.chat.id] || "uz";
+  ctx.reply(getText(lang, 'company_info'));
+});
+
+// Aloqa
+bot.hears([/Aloqa/i, /Контакты/i, /📞 Aloqa/i, /📞 Контакты/i], async (ctx) => {
+  const lang = userLang[ctx.chat.id] || "uz";
+  ctx.reply(getText(lang, 'contact_info'));
+});
+
+// ============= KATEGORIYA QO'SHISH =============
+bot.hears([/Kategoriya qo'shish/i, /Добавить категорию/i, /➕ Kategoriya qo'shish/i, /➕ Добавить категорию/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  session[ctx.chat.id] = { step: "add_category_only", data: {} };
+  const lang = userLang[ctx.chat.id] || "uz";
+  ctx.reply(getText(lang, 'enter_category_name'));
+});
+
+// ============= MAHSULOT QO'SHISH =============
+bot.hears([/Mahsulot qo'shish/i, /Добавить продукт/i, /🛍 Mahsulot qo'shish/i, /🛍 Добавить продукт/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `add_to_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Kategoriyaga mahsulot qo'shish callback
+bot.action(/add_to_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  session[ctx.chat.id] = {
+    step: "add_product_name",
+    categoryId: categoryId,
+    data: {}
+  };
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'enter_product_name'));
+});
+
+// ============= TAHRIRLASH =============
+bot.hears([/^Tahrirlash$/i, /^Редактировать$/i, /✏️ Tahrirlash/i, /✏️ Редактировать/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.reply(getText(lang, 'what_edit'), getEditMenu(lang));
+});
+
+// Kategoriya tahrirlash
+bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i, /📂 Kategoriya tahrirlash/i, /📂 Редактировать категорию/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `edit_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Mahsulot tahrirlash
+bot.hears([/Mahsulot tahrirlash/i, /Редактировать продукт/i, /📝 Mahsulot tahrirlash/i, /📝 Редактировать продукт/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `edit_prod_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Media (Rasm/Video) tahrirlash
+bot.hears([/Media tahrirlash/i, /Редактировать медиа/i, /🖼📹 Media tahrirlash/i, /🖼📹 Редактировать медиа/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `edit_media_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ============= O'CHIRISH =============
+bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Удалить/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.reply(getText(lang, 'what_delete'), getDeleteMenu(lang));
+});
+
+// Kategoriya o'chirish
+bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 Kategoriya o'chirish/i, /🗑 Удалить категорию/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(`🗑 ${categoryName}`, `delete_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Mahsulot o'chirish
+bot.hears([/Mahsulot o'chirish/i, /Удалить продукт/i, /🗑 Mahsulot o'chirish/i, /🗑 Удалить продукт/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `delete_prod_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ============= ORQAGA =============
+bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], async (ctx) => {
+  const lang = userLang[ctx.chat.id] || "uz";
+  delete session[ctx.chat.id]; // Sessionni tozalash
+  
+  if (isAdmin(ctx.from.id)) {
+    ctx.reply(getText(lang, 'admin_panel'), getAdminMenu(lang));
+  } else {
+    ctx.reply(getText(lang, 'main_menu'), getMainMenu(lang));
+  }
+});
+
+// ================= CALLBACK ACTIONS =================
+// Kategoriya tahrirlash
+bot.action(/edit_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  session[ctx.chat.id] = { step: "edit_category_name", categoryId };
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'enter_new_name'));
+});
+
+// Mahsulot tahrirlash uchun kategoriya tanlash
+bot.action(/edit_prod_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  try {
+    const products = await getProductsByCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    
+    if (products.length === 0) {
+      return ctx.reply(getText(lang, 'no_products'));
+    }
+
+    const productButtons = products.map((p, index) => {
+      const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
+      return [Markup.button.callback(`${index + 1}. ${productName || 'Nomsiz'}`, `edit_prod_${p.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_product'),
+      Markup.inlineKeyboard(productButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Mahsulot tahrirlash - nom
+bot.action(/edit_prod_(\d+)/, async (ctx) => {
+  const productId = ctx.match[1];
+  session[ctx.chat.id] = { step: "edit_product_name", productId, data: {} };
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'enter_new_name'));
+});
+
+// Media tahrirlash uchun kategoriya tanlash
+bot.action(/edit_media_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  try {
+    const products = await getProductsByCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    
+    if (products.length === 0) {
+      return ctx.reply(getText(lang, 'no_products'));
+    }
+
+    const productButtons = products.map((p, index) => {
+      const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
+      const mediaIcon = p.media_type === 'video' ? '🎬' : '📷';
+      return [Markup.button.callback(`${mediaIcon} ${index + 1}. ${productName || 'Nomsiz'}`, `edit_media_${p.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_product'),
+      Markup.inlineKeyboard(productButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Media tahrirlash
+bot.action(/edit_media_(\d+)/, async (ctx) => {
+  const productId = ctx.match[1];
+  session[ctx.chat.id] = { step: "edit_product_media", productId };
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'send_photo_or_video'));
+});
+
+// Kategoriya o'chirish action
+bot.action(/delete_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  try {
+    await deleteCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    ctx.reply(getText(lang, 'category_deleted'));
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Mahsulot o'chirish uchun kategoriya tanlash
+bot.action(/delete_prod_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  try {
+    const products = await getProductsByCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    
+    if (products.length === 0) {
+      return ctx.reply(getText(lang, 'no_products'));
+    }
+
+    const productButtons = products.map((p, index) => {
+      const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
+      return [Markup.button.callback(`🗑 ${index + 1}. ${productName || 'Nomsiz'}`, `delete_prod_${p.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_product'),
+      Markup.inlineKeyboard(productButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Mahsulot o'chirish action
+bot.action(/delete_prod_(\d+)/, async (ctx) => {
+  const productId = ctx.match[1];
+  try {
+    await deleteProduct(productId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    ctx.reply(getText(lang, 'product_deleted'));
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ================= KATALOG =================
+bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/i], async (ctx) => {
+  try {
+    const categories = await getCategories();
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    if (categories.length === 0) {
+      return ctx.reply(getText(lang, 'no_categories'));
+    }
+
+    const categoryButtons = categories.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `view_cat_${c.id}`)];
+    });
+
+    ctx.reply(
+      getText(lang, 'select_category'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Kategoriya ko'rish
+bot.action(/view_cat_(\d+)/, async (ctx) => {
+  const categoryId = ctx.match[1];
+  try {
+    const products = await getProductsByCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
+    
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    
+    if (products.length === 0) {
+      return ctx.reply(getText(lang, 'no_products'));
+    }
+
+    for (const product of products) {
+      const productName = lang === 'uz' ? (product.name_uz || product.name_ru) : (product.name_ru || product.name_uz);
+      const productDescription = lang === 'uz' ? (product.description_uz || product.description_ru) : (product.description_ru || product.description_uz);
+      
+      const caption = `🏷 ${productName}\n\n📝 ${productDescription}`;
+      
+      // Video yoki rasm yuborish
+      if (product.media_type === 'video' && product.video_id) {
+        await ctx.replyWithVideo(product.video_id, {
+          caption: caption
+        });
+      } else if (product.photo_id) {
+        await ctx.replyWithPhoto(product.photo_id, {
+          caption: caption
+        });
+      }
+    }
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ================= MATN HANDLER =================
+bot.on("text", async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state) return;
+
+  const lang = userLang[ctx.chat.id] || "uz";
+  let inputText = ctx.message.text;
+
+  try {
+    // Faqat kategoriya qo'shish
+    if (state.step === "add_category_only") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      
+      // Tilni aniqlash
+      const detectedLang = detectLanguage(inputText);
+      let nameUz, nameRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = inputText;
+        nameRu = await translateText(inputText, 'uz', 'ru');
+      } else {
+        nameRu = inputText;
+        nameUz = await translateText(inputText, 'ru', 'uz');
+      }
+      
+      await addCategory(nameUz, nameRu);
+      delete session[ctx.chat.id];
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'category_saved'));
+    }
+
+    // Kategoriya qo'shish va mahsulot qo'shish
+    if (state.step === "add_category_name") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      
+      const detectedLang = detectLanguage(inputText);
+      let nameUz, nameRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = inputText;
+        nameRu = await translateText(inputText, 'uz', 'ru');
+      } else {
+        nameRu = inputText;
+        nameUz = await translateText(inputText, 'ru', 'uz');
+      }
+      
+      const category = await addCategory(nameUz, nameRu);
+      session[ctx.chat.id] = {
+        step: "add_product_name",
+        categoryId: category.id,
+        data: {}
+      };
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'enter_product_name'));
+    }
+
+    if (state.step === "add_product_name") {
+      session[ctx.chat.id].step = "add_product_description";
+      session[ctx.chat.id].data.originalName = inputText;
+      session[ctx.chat.id].data.detectedLang = detectLanguage(inputText);
+      return ctx.reply(getText(lang, 'enter_product_description'));
+    }
+
+    if (state.step === "add_product_description") {
+      session[ctx.chat.id].step = "add_product_media";
+      session[ctx.chat.id].data.originalDescription = inputText;
+      return ctx.reply(getText(lang, 'send_photo_or_video'));
+    }
+
+    // Kategoriya tahrirlash
+    if (state.step === "edit_category_name") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      
+      const detectedLang = detectLanguage(inputText);
+      let nameUz, nameRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = inputText;
+        nameRu = await translateText(inputText, 'uz', 'ru');
+      } else {
+        nameRu = inputText;
+        nameUz = await translateText(inputText, 'ru', 'uz');
+      }
+      
+      await updateCategory(state.categoryId, nameUz, nameRu);
+      delete session[ctx.chat.id];
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'category_updated'));
+    }
+
+    // Mahsulot tahrirlash
+    if (state.step === "edit_product_name") {
+      session[ctx.chat.id].step = "edit_product_description";
+      session[ctx.chat.id].data.originalName = inputText;
+      session[ctx.chat.id].data.detectedLang = detectLanguage(inputText);
+      return ctx.reply(getText(lang, 'enter_new_description'));
+    }
+
+    if (state.step === "edit_product_description") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      
+      const { originalName, detectedLang } = session[ctx.chat.id].data;
+      const originalDescription = inputText;
+      
+      let nameUz, nameRu, descriptionUz, descriptionRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = originalName;
+        nameRu = await translateText(originalName, 'uz', 'ru');
+        descriptionUz = originalDescription;
+        descriptionRu = await translateText(originalDescription, 'uz', 'ru');
+      } else {
+        nameRu = originalName;
+        nameUz = await translateText(originalName, 'ru', 'uz');
+        descriptionRu = originalDescription;
+        descriptionUz = await translateText(originalDescription, 'ru', 'uz');
+      }
+      
+      await updateProduct(state.productId, nameUz, nameRu, descriptionUz, descriptionRu);
+      delete session[ctx.chat.id];
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'product_updated'));
+    }
+  } catch (error) {
+    console.error('Matn handler xatosi:', error);
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ================= MEDIA HANDLER (RASM VA VIDEO) =================
+// Rasm handler
+bot.on("photo", async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state) return;
+  
+  const lang = userLang[ctx.chat.id] || "uz";
+
+  try {
+    if (state.step === "add_product_media") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      const photo = ctx.message.photo.pop();
+      
+      const { originalName, originalDescription, detectedLang } = state.data;
+      let nameUz, nameRu, descriptionUz, descriptionRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = originalName;
+        nameRu = await translateText(originalName, 'uz', 'ru');
+        descriptionUz = originalDescription;
+        descriptionRu = await translateText(originalDescription, 'uz', 'ru');
+      } else {
+        nameRu = originalName;
+        nameUz = await translateText(originalName, 'ru', 'uz');
+        descriptionRu = originalDescription;
+        descriptionUz = await translateText(originalDescription, 'ru', 'uz');
+      }
+      
+      await addProduct(state.categoryId, nameUz, nameRu, descriptionUz, descriptionRu, photo.file_id, 'photo');
+      delete session[ctx.chat.id];
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'product_saved'));
+    }
+
+    if (state.step === "edit_product_media") {
+      const photo = ctx.message.photo.pop();
+      await updateProductMedia(state.productId, photo.file_id, 'photo');
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'media_updated'));
+    }
+  } catch (error) {
+    console.error('Rasm handler xatosi:', error);
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// Video handler
+bot.on("video", async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state) return;
+  
+  const lang = userLang[ctx.chat.id] || "uz";
+
+  try {
+    if (state.step === "add_product_media") {
+      const translatingMsg = await ctx.reply(getText(lang, 'translating'));
+      const video = ctx.message.video;
+      
+      const { originalName, originalDescription, detectedLang } = state.data;
+      let nameUz, nameRu, descriptionUz, descriptionRu;
+      
+      if (detectedLang === 'uz') {
+        nameUz = originalName;
+        nameRu = await translateText(originalName, 'uz', 'ru');
+        descriptionUz = originalDescription;
+        descriptionRu = await translateText(originalDescription, 'uz', 'ru');
+      } else {
+        nameRu = originalName;
+        nameUz = await translateText(originalName, 'ru', 'uz');
+        descriptionRu = originalDescription;
+        descriptionUz = await translateText(originalDescription, 'ru', 'uz');
+      }
+      
+      await addProduct(state.categoryId, nameUz, nameRu, descriptionUz, descriptionRu, video.file_id, 'video');
+      delete session[ctx.chat.id];
+      
+      await ctx.telegram.deleteMessage(ctx.chat.id, translatingMsg.message_id);
+      return ctx.reply(getText(lang, 'product_saved'));
+    }
+
+    if (state.step === "edit_product_media") {
+      const video = ctx.message.video;
+      await updateProductMedia(state.productId, video.file_id, 'video');
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'media_updated'));
+    }
+  } catch (error) {
+    console.error('Video handler xatosi:', error);
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
+// ================= XATO HANDLER =================
+bot.catch((err, ctx) => {
+  console.error('Bot xatosi:', err);
+  const lang = userLang[ctx.chat?.id] || "uz";
+  if (ctx && ctx.reply) {
+    ctx.reply("❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
+  }
+});
+
+// ================== BOT ISHGA TUSHIRISH ==================
+bot.launch()
+  .then(() => {
+    console.log('✅ Bot muvaffaqiyatli ishga tushdi!');
+    console.log(`📱 Bot username: @${bot.botInfo?.username || 'unknown'}`);
+  })
+  .catch((error) => {
+    console.error('❌ Bot ishga tushurishda xato:', error);
+    process.exit(1);
+  });
+
+// Graceful shutdown
+process.once("SIGINT", () => {
+  console.log('🛑 Bot to\'xtatilmoqda (SIGINT)...');
+  bot.stop("SIGINT");
+  pool.end();
+  process.exit(0);
+});
+
+process.once("SIGTERM", () => {
+  console.log('🛑 Bot to\'xtatilmoqda (SIGTERM)...');
+  bot.stop("SIGTERM"); 
+  pool.end();
+  process.exit(0);
+});
+
+console.log('🎯 Bot tayyor! /start buyrug\'ini yuboring.');
