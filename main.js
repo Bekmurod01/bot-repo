@@ -10,7 +10,7 @@ config();
 
 // Remove Pool, not needed for sqlite
 const bot = new Telegraf("8266418876:AAEo5g5QasGeRUw0cSotD08frL8NzFPjCcQ");
-const adminId = parseInt("1940187770"); // parseInt qilish muhim
+const adminId = parseInt("1414633073"); // parseInt qilish muhim
 
 // 📂 PostgreSQL ulanish
 let db;
