@@ -19,9 +19,11 @@
   "author": "Izolux Team",
   "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.6.1",
+    "mysql2": "^3.15.0",
     "node-fetch": "^3.3.2",
-    "pg": "^8.11.3",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
     "telegraf": "^4.16.3"
   },
   "devDependencies": {
@@ -29,5 +31,13 @@
   },
   "engines": {
     "node": ">=16.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ogabekuz/izolux-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ogabekuz/izolux-bot/issues"
+  },
+  "homepage": "https://github.com/ogabekuz/izolux-bot#readme"
 }
