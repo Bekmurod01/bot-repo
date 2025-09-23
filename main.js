@@ -12,8 +12,8 @@ config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = parseInt(process.env.ADMIN_ID);
 
-const bot = new Telegraf("8266418876:AAEo5g5QasGeRUw0cSotD08frL8NzFPjCcQ");
-const adminId = parseInt("1940187770"); // parseInt qilish muhim
+// const bot = new Telegraf("8266418876:AAEo5g5QasGeRUw0cSotD08frL8NzFPjCcQ");
+// const adminId = parseInt("1940187770"); // parseInt qilish muhim
 
 // 📂 PostgreSQL ulanish
 let db;
