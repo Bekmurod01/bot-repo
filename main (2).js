@@ -1,3 +1,4 @@
+
 import { Telegraf, Markup } from "telegraf";
 import { config } from "dotenv";
 import sqlite3 from "sqlite3"; // npm install sqlite3
@@ -8,8 +9,8 @@ import fetch from "node-fetch"; // npm install node-fetch
 config();
 
 // Remove Pool, not needed for sqlite
-const bot = new Telegraf(process.env.BOT_TOKEN);
-const adminId = parseInt(process.env.ADMIN_ID); // parseInt qilish muhim
+const bot = new Telegraf("8266418876:AAEo5g5QasGeRUw0cSotD08frL8NzFPjCcQ");
+const adminId = parseInt("1940187770"); // parseInt qilish muhim
 
 // 📂 PostgreSQL ulanish
 let db;
@@ -2166,3 +2167,4 @@ process.once("SIGTERM", () => {
 });
 
 console.log("🎯 Bot tayyor! /start buyrug'ini yuboring.");
+
