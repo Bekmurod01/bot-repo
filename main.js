@@ -9,15 +9,16 @@ config();
 
 // Remove Pool, not needed for sqlite
 const bot = new Telegraf(process.env.BOT_TOKEN);
+const adminId = parseInt(process.env.ADMIN_ID); // asosiy admin
 
-// Bir nechta admin uchun massiv qilamiz
-const adminIds = process.env.ADMIN_IDS
-  ? process.env.ADMIN_IDS.split(",").map(id => parseInt(id.trim()))
+// qo‘shimcha adminlar uchun massiv
+const extraAdmins = process.env.EXTRA_ADMINS
+  ? process.env.EXTRA_ADMINS.split(",").map(id => parseInt(id.trim()))
   : [];
 
-// Admin tekshirish funksiyasi
+// umumiy adminlarni tekshiruvchi funksiya
 function isAdmin(userId) {
-  return adminIds.includes(userId);
+  return userId === adminId || extraAdmins.includes(userId);
 }
 // 📂 PostgreSQL ulanish
 let db;
