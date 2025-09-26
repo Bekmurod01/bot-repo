@@ -55,126 +55,116 @@ let db;
 })();
 
 // ===================== DATABASE FUNCTIONS =====================
+// 📂 Kategoriyalar
 async function addCategory(name_uz, name_ru, parent_id = null) {
   const query = `
-    INSERT INTO categories (name_uz, name_ru, parent_id) 
-    VALUES ($1, $2, $3) 
-    RETURNING *
+    INSERT INTO categories (name_uz, name_ru, parent_id)
+    VALUES (?, ?, ?)
   `;
-  const result = await pool.query(query, [name_uz, name_ru, parent_id]);
-  return result.rows[0];
+  const result = await db.run(query, [name_uz, name_ru, parent_id]);
+  return { id: result.lastID, name_uz, name_ru, parent_id };
 }
 
 async function getCategories() {
   try {
-    const res = await pool.query("SELECT * FROM categories ORDER BY id DESC");
-    return res.rows;
+    return await db.all("SELECT * FROM categories ORDER BY id DESC");
   } catch (error) {
-    console.error('Kategoriyalarni olishda xato:', error);
+    console.error("Kategoriyalarni olishda xato:", error);
     throw error;
   }
 }
 
 async function getRootCategories() {
   try {
-    const res = await pool.query("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
-    return res.rows;
+    return await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
   } catch (error) {
-    console.error('Root kategoriyalarni olishda xato:', error);
+    console.error("Root kategoriyalarni olishda xato:", error);
     throw error;
   }
 }
 
 async function getSubCategories(parentId) {
   try {
-    const res = await pool.query("SELECT * FROM categories WHERE parent_id = $1 ORDER BY id DESC", [parentId]);
-    return res.rows;
+    return await db.all("SELECT * FROM categories WHERE parent_id = ? ORDER BY id DESC", [parentId]);
   } catch (error) {
-    console.error('Sub-kategoriyalarni olishda xato:', error);
+    console.error("Sub-kategoriyalarni olishda xato:", error);
     throw error;
   }
 }
 
 async function getCategoryById(id) {
   try {
-    const res = await pool.query("SELECT * FROM categories WHERE id = $1", [id]);
-    return res.rows[0];
+    return await db.get("SELECT * FROM categories WHERE id = ?", [id]);
   } catch (error) {
-    console.error('Kategoriyani ID bo\'yicha olishda xato:', error);
+    console.error("Kategoriyani ID bo'yicha olishda xato:", error);
     throw error;
   }
 }
 
 async function updateCategory(id, newNameUz, newNameRu) {
   try {
-    await pool.query("UPDATE categories SET name_uz=$1, name_ru=$2 WHERE id=$3", [newNameUz, newNameRu, id]);
+    await db.run("UPDATE categories SET name_uz=?, name_ru=? WHERE id=?", [newNameUz, newNameRu, id]);
   } catch (error) {
-    console.error('Kategoriyani yangilashda xato:', error);
+    console.error("Kategoriyani yangilashda xato:", error);
     throw error;
   }
 }
 
 async function deleteCategory(id) {
   try {
-    // Subcategoriyalarni va ularning mahsulotlarini ham o'chirish
     const subCategories = await getSubCategories(id);
     for (const subCat of subCategories) {
       await deleteCategory(subCat.id);
     }
-    
-    // Bu kategoriyadagi mahsulotlarni o'chirish
-    await pool.query("DELETE FROM products WHERE category_id=$1", [id]);
-    
-    // Kategoriyani o'chirish
-    await pool.query("DELETE FROM categories WHERE id=$1", [id]);
+
+    await db.run("DELETE FROM products WHERE category_id=?", [id]);
+    await db.run("DELETE FROM categories WHERE id=?", [id]);
   } catch (error) {
-    console.error('Kategoriyani o\'chirishda xato:', error);
+    console.error("Kategoriyani o'chirishda xato:", error);
     throw error;
   }
 }
 
+// 📂 Mahsulotlar
 async function addProduct(categoryId, nameUz, nameRu, descriptionUz, descriptionRu) {
   try {
-    const res = await pool.query(
-      "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+    const result = await db.run(
+      "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES (?, ?, ?, ?, ?)",
       [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
     );
-    return res.rows[0];
+    return { id: result.lastID, categoryId, nameUz, nameRu, descriptionUz, descriptionRu };
   } catch (error) {
-    console.error('Mahsulot qo\'shishda xato:', error);
+    console.error("Mahsulot qo'sishda xato:", error);
     throw error;
   }
 }
 
 async function getProductsByCategory(categoryId) {
   try {
-    const res = await pool.query(
-      "SELECT * FROM products WHERE category_id = $1 ORDER BY id DESC",
-      [categoryId]
-    );
-    return res.rows;
+    return await db.all("SELECT * FROM products WHERE category_id = ? ORDER BY id DESC", [categoryId]);
   } catch (error) {
-    console.error('Mahsulotlarni olishda xato:', error);
+    console.error("Mahsulotlarni olishda xato:", error);
     throw error;
   }
 }
 
 async function getProductById(id) {
   try {
-    const res = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
-    return res.rows[0];
+    return await db.get("SELECT * FROM products WHERE id = ?", [id]);
   } catch (error) {
-    console.error('Mahsulotni ID bo\'yicha olishda xato:', error);
+    console.error("Mahsulotni ID bo'yicha olishda xato:", error);
     throw error;
   }
 }
 
 async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
   try {
-    await pool.query("UPDATE products SET name_uz=$1, name_ru=$2, description_uz=$3, description_ru=$4 WHERE id=$5",
-      [nameUz, nameRu, descriptionUz, descriptionRu, id]);
+    await db.run(
+      "UPDATE products SET name_uz=?, name_ru=?, description_uz=?, description_ru=? WHERE id=?",
+      [nameUz, nameRu, descriptionUz, descriptionRu, id]
+    );
   } catch (error) {
-    console.error('Mahsulotni yangilashda xato:', error);
+    console.error("Mahsulotni yangilashda xato:", error);
     throw error;
   }
 }
@@ -182,47 +172,48 @@ async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
 async function deleteProduct(id) {
   try {
     await deleteProductMedia(id);
-    await pool.query("DELETE FROM products WHERE id=$1", [id]);
+    await db.run("DELETE FROM products WHERE id=?", [id]);
   } catch (error) {
-    console.error('Mahsulotni o\'chirishda xato:', error);
+    console.error("Mahsulotni o'chirishda xato:", error);
     throw error;
   }
 }
 
+// 📂 Media fayllar
 async function addProductMedia(productId, fileId, mediaType, fileSize = null, mimeType = null, orderIndex = 0) {
   try {
-    const res = await pool.query(
-      "INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    const result = await db.run(
+      "INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES (?, ?, ?, ?, ?, ?)",
       [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
     );
-    return res.rows[0];
+    return { id: result.lastID, productId, fileId, mediaType, fileSize, mimeType, orderIndex };
   } catch (error) {
-    console.error('Media qo\'shishda xato:', error);
+    console.error("Media qo'sishda xato:", error);
     throw error;
   }
 }
 
 async function getProductMedia(productId) {
   try {
-    const res = await pool.query(
-      "SELECT * FROM product_media WHERE product_id = $1 ORDER BY order_index ASC, created_at ASC",
+    return await db.all(
+      "SELECT * FROM product_media WHERE product_id = ? ORDER BY order_index ASC",
       [productId]
     );
-    return res.rows;
   } catch (error) {
-    console.error('Media olishda xato:', error);
+    console.error("Media olishda xato:", error);
     throw error;
   }
 }
 
 async function deleteProductMedia(productId) {
   try {
-    await pool.query("DELETE FROM product_media WHERE product_id = $1", [productId]);
+    await db.run("DELETE FROM product_media WHERE product_id = ?", [productId]);
   } catch (error) {
-    console.error('Media o\'chirishda xato:', error);
+    console.error("Media o'chirishda xato:", error);
     throw error;
   }
 }
+
 
 // ===================== GLOBAL VARIABLES =====================
 const userLang = {};
