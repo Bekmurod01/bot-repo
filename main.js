@@ -422,30 +422,27 @@ bot.action(/add_subcat_to_(\d+)/, async (ctx) => {
 });
 
 // ===================== ADD PRODUCT =====================
-bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /🛍 Mahsulot qo'shish/i, /🛍 Добавить товар/i], async (ctx) => {
+bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /Mahsulot qo'shish/i, /Добавить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `add_prod_to_${c.id}`)];
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `add_prod_to_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
-  } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
+  } catch (err) {
+    console.error(err);
+    ctx.reply("Xatolik");
   }
 });
 
