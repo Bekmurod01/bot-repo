@@ -422,18 +422,18 @@ bot.action(/add_subcat_to_(\d+)/, async (ctx) => {
 });
 
 // ===================== ADD PRODUCT =====================
-bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /🛍 Mahsulot qo'shish/i, /🛍 Добавить товар/i], async (ctx) => {
+bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /Mahsulot qo'shish/i, /Добавить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `add_prod_to_${c.id}`)];
     });
@@ -445,7 +445,8 @@ bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /🛍 Mahsulot 
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error("Mahsulot qo'shishda xato:", error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
@@ -501,18 +502,18 @@ bot.hears([/Kategoriya tahrirlash/i, /Редактировать категор�
 });
 
 // Edit Subcategory
-bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i, /📂 Bo'lim tahrirlash/i, /📂 Редактировать подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i, /Bo'lim tahrirlash/i, /Редактировать подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `edit_subcat_${c.id}`)];
     });
@@ -524,23 +525,24 @@ bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатего�
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error("Bo'lim tahrirlashda xato:", error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // Edit Product
-bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /📝 Mahsulot tahrirlash/i, /📝 Редактировать товар/i], async (ctx) => {
+bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /Mahsulot tahrirlash/i, /Редактировать товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `edit_prod_cat_${c.id}`)];
     });
@@ -552,7 +554,8 @@ bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /�
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error("Mahsulot tahrirlashda xato:", error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
