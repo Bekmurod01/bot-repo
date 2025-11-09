@@ -596,11 +596,15 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 
 });
 
 // Delete Subcategory
-bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
+bot.hears([
+  /Bo'lim o'chirish/i,
+  /Удалить подкатегорию/i,
+  /Bo'lim o'chirish/i,
+  /Удалить подкатегорию/i
+], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    // TO‘G‘RI:
     const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
@@ -608,28 +612,28 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /Bo'
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`${categoryName}`, `delete_subcat_${c.id}`)];
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(`${name}`, `delete_subcat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-      console.error("Bo'lim o'chirishda xato:", error);
-      ctx.reply("Xatolik yuz berdi");
+    console.error("Bo'lim o'chirish tanlashda xato:", error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 // Delete Product
-bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
+bot.hears([
+  /Mahsulot o'chirish/i,
+  /Удалить товар/i,
+  /Mahsulot o'chirish/i,
+  /Удалить товар/i
+], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    // TO‘G‘RI:
     const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
@@ -637,19 +641,15 @@ bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /Mahsulot o'chir
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `delete_prod_cat_${c.id}`)];
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `delete_prod_cat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error("Mahsulot o'chirishda xato:", error);
+    console.error("Mahsulot o'chirish tanlashda xato:", error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
