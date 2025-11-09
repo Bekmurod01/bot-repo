@@ -598,6 +598,32 @@ bot.hears(
   }
 );
 
+bot.hears(
+  [/Bo'lim qo'shish/i, /Добавить подкатегорию/i],
+  async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return;
+
+    try {
+      const rootCategories = await getRootCategories();
+      const lang = userLang[ctx.chat.id] || "uz";
+
+      if (rootCategories.length === 0) {
+        return ctx.reply(getText(lang, "no_categories"));
+      }
+
+      const buttons = rootCategories.map((c) => {
+        const name = lang === "uz" ? c.name_uz : c.name_ru;
+        return [Markup.button.callback(name, `add_sub_to_${c.id}`)];
+      });
+      buttons.push([Markup.button.callback(getText(lang, "back"), "admin_back")]);
+
+      ctx.reply(getText(lang, "select_parent_category"), Markup.inlineKeyboard(buttons));
+    } catch (error) {
+      ctx.reply("Xatolik yuz berdi");
+    }
+  }
+);
+
 // ============= MAHSULOT QO'SHISH =============
 bot.hears(
   [
@@ -739,6 +765,33 @@ bot.hears(
       );
     } catch (error) {
       ctx.reply("❌ Xatolik yuz berdi");
+    }
+  }
+);
+bot.hears(
+  [/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i],
+  async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return;
+
+    try {
+      const subCategories = await db.all(
+        "SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC"
+      );
+      const lang = userLang[ctx.chat.id] || "uz";
+
+      if (subCategories.length === 0) {
+        return ctx.reply(getText(lang, "no_subcategories"));
+      }
+
+      const buttons = subCategories.map((c) => {
+        const name = lang === "uz" ? c.name_uz : c.name_ru;
+        return [Markup.button.callback(` ${name}`, `edit_subcat_${c.id}`)];
+      });
+      buttons.push([Markup.button.callback(getText(lang, "back"), "admin_back")]);
+
+      ctx.reply(getText(lang, "select_subcategory"), Markup.inlineKeyboard(buttons));
+    } catch (error) {
+      ctx.reply("Xatolik yuz berdi");
     }
   }
 );
