@@ -1,197 +1,150 @@
 import { Telegraf, Markup } from "telegraf";
 import { config } from "dotenv";
-import pkg from "pg";
-import fetch from 'node-fetch';
+import sqlite3 from "sqlite3"; // npm install sqlite3
+import { open } from "sqlite";
+import fetch from "node-fetch"; // npm install node-fetch
 
 // Environment variables ni yuklash
 config();
 
-const { Pool } = pkg;
+// Bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = parseInt(process.env.ADMIN_ID);
 
-// PostgreSQL ulanish
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASS,
-  port: parseInt(process.env.DB_PORT) || 5432,
-});
+// 📂 SQLite ulanish
+let db;
+(async () => {
+  db = await open({
+    filename: "./database.sqlite",
+    driver: sqlite3.Database,
+  });
+  console.log("✅ SQLite database ga muvaffaqiyatli ulanildi");
 
-// Database ulanishini tekshirish
-pool.connect()
-  .then(() => console.log('✅ Database ga muvaffaqiyatli ulanildi'))
-  .catch(err => console.error('❌ Database ulanish xatosi:', err));
+  // Jadval yaratish
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      parent_id INTEGER,
+      FOREIGN KEY (parent_id) REFERENCES categories(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      description_uz TEXT,
+      description_ru TEXT,
+      FOREIGN KEY (category_id) REFERENCES categories(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS product_media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      file_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      file_size INTEGER,
+      mime_type TEXT,
+      order_index INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+  `);
+})();
 
 // ===================== DATABASE FUNCTIONS =====================
+
+// ===== Categories =====
 async function addCategory(name_uz, name_ru, parent_id = null) {
-  const query = `
-    INSERT INTO categories (name_uz, name_ru, parent_id) 
-    VALUES ($1, $2, $3) 
-    RETURNING *
-  `;
-  const result = await pool.query(query, [name_uz, name_ru, parent_id]);
-  return result.rows[0];
+  const result = await db.run(
+    `INSERT INTO categories (name_uz, name_ru, parent_id) VALUES (?, ?, ?)`,
+    [name_uz, name_ru, parent_id]
+  );
+  return { id: result.lastID, name_uz, name_ru, parent_id };
 }
 
 async function getCategories() {
-  try {
-    const res = await pool.query("SELECT * FROM categories ORDER BY id DESC");
-    return res.rows;
-  } catch (error) {
-    console.error('Kategoriyalarni olishda xato:', error);
-    throw error;
-  }
+  return await db.all(`SELECT * FROM categories ORDER BY id DESC`);
 }
 
 async function getRootCategories() {
-  try {
-    const res = await pool.query("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
-    return res.rows;
-  } catch (error) {
-    console.error('Root kategoriyalarni olishda xato:', error);
-    throw error;
-  }
+  return await db.all(`SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC`);
 }
 
 async function getSubCategories(parentId) {
-  try {
-    const res = await pool.query("SELECT * FROM categories WHERE parent_id = $1 ORDER BY id DESC", [parentId]);
-    return res.rows;
-  } catch (error) {
-    console.error('Sub-kategoriyalarni olishda xato:', error);
-    throw error;
-  }
+  return await db.all(`SELECT * FROM categories WHERE parent_id = ? ORDER BY id DESC`, [parentId]);
 }
 
 async function getCategoryById(id) {
-  try {
-    const res = await pool.query("SELECT * FROM categories WHERE id = $1", [id]);
-    return res.rows[0];
-  } catch (error) {
-    console.error('Kategoriyani ID bo\'yicha olishda xato:', error);
-    throw error;
-  }
+  return await db.get(`SELECT * FROM categories WHERE id = ?`, [id]);
 }
 
 async function updateCategory(id, newNameUz, newNameRu) {
-  try {
-    await pool.query("UPDATE categories SET name_uz=$1, name_ru=$2 WHERE id=$3", [newNameUz, newNameRu, id]);
-  } catch (error) {
-    console.error('Kategoriyani yangilashda xato:', error);
-    throw error;
-  }
+  await db.run(`UPDATE categories SET name_uz=?, name_ru=? WHERE id=?`, [
+    newNameUz,
+    newNameRu,
+    id,
+  ]);
 }
 
 async function deleteCategory(id) {
-  try {
-    // Subcategoriyalarni va ularning mahsulotlarini ham o'chirish
-    const subCategories = await getSubCategories(id);
-    for (const subCat of subCategories) {
-      await deleteCategory(subCat.id);
-    }
-    
-    // Bu kategoriyadagi mahsulotlarni o'chirish
-    await pool.query("DELETE FROM products WHERE category_id=$1", [id]);
-    
-    // Kategoriyani o'chirish
-    await pool.query("DELETE FROM categories WHERE id=$1", [id]);
-  } catch (error) {
-    console.error('Kategoriyani o\'chirishda xato:', error);
-    throw error;
+  const subCategories = await getSubCategories(id);
+  for (const subCat of subCategories) {
+    await deleteCategory(subCat.id);
   }
+  await db.run(`DELETE FROM products WHERE category_id=?`, [id]);
+  await db.run(`DELETE FROM categories WHERE id=?`, [id]);
 }
 
+// ===== Products =====
 async function addProduct(categoryId, nameUz, nameRu, descriptionUz, descriptionRu) {
-  try {
-    const res = await pool.query(
-      "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
-    );
-    return res.rows[0];
-  } catch (error) {
-    console.error('Mahsulot qo\'shishda xato:', error);
-    throw error;
-  }
+  const result = await db.run(
+    `INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES (?, ?, ?, ?, ?)`,
+    [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
+  );
+  return { id: result.lastID, categoryId, nameUz, nameRu, descriptionUz, descriptionRu };
 }
 
 async function getProductsByCategory(categoryId) {
-  try {
-    const res = await pool.query(
-      "SELECT * FROM products WHERE category_id = $1 ORDER BY id DESC",
-      [categoryId]
-    );
-    return res.rows;
-  } catch (error) {
-    console.error('Mahsulotlarni olishda xato:', error);
-    throw error;
-  }
+  return await db.all(`SELECT * FROM products WHERE category_id=? ORDER BY id DESC`, [categoryId]);
 }
 
 async function getProductById(id) {
-  try {
-    const res = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
-    return res.rows[0];
-  } catch (error) {
-    console.error('Mahsulotni ID bo\'yicha olishda xato:', error);
-    throw error;
-  }
+  return await db.get(`SELECT * FROM products WHERE id=?`, [id]);
 }
 
 async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
-  try {
-    await pool.query("UPDATE products SET name_uz=$1, name_ru=$2, description_uz=$3, description_ru=$4 WHERE id=$5",
-      [nameUz, nameRu, descriptionUz, descriptionRu, id]);
-  } catch (error) {
-    console.error('Mahsulotni yangilashda xato:', error);
-    throw error;
-  }
+  await db.run(
+    `UPDATE products SET name_uz=?, name_ru=?, description_uz=?, description_ru=? WHERE id=?`,
+    [nameUz, nameRu, descriptionUz, descriptionRu, id]
+  );
 }
 
 async function deleteProduct(id) {
-  try {
-    await deleteProductMedia(id);
-    await pool.query("DELETE FROM products WHERE id=$1", [id]);
-  } catch (error) {
-    console.error('Mahsulotni o\'chirishda xato:', error);
-    throw error;
-  }
+  await deleteProductMedia(id);
+  await db.run(`DELETE FROM products WHERE id=?`, [id]);
 }
 
+// ===== Product Media =====
 async function addProductMedia(productId, fileId, mediaType, fileSize = null, mimeType = null, orderIndex = 0) {
-  try {
-    const res = await pool.query(
-      "INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
-    );
-    return res.rows[0];
-  } catch (error) {
-    console.error('Media qo\'shishda xato:', error);
-    throw error;
-  }
+  const result = await db.run(
+    `INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES (?, ?, ?, ?, ?, ?)`,
+    [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
+  );
+  return { id: result.lastID, productId, fileId, mediaType, fileSize, mimeType, orderIndex };
 }
 
 async function getProductMedia(productId) {
-  try {
-    const res = await pool.query(
-      "SELECT * FROM product_media WHERE product_id = $1 ORDER BY order_index ASC, created_at ASC",
-      [productId]
-    );
-    return res.rows;
-  } catch (error) {
-    console.error('Media olishda xato:', error);
-    throw error;
-  }
+  return await db.all(
+    `SELECT * FROM product_media WHERE product_id=? ORDER BY order_index ASC, created_at ASC`,
+    [productId]
+  );
 }
 
 async function deleteProductMedia(productId) {
-  try {
-    await pool.query("DELETE FROM product_media WHERE product_id = $1", [productId]);
-  } catch (error) {
-    console.error('Media o\'chirishda xato:', error);
-    throw error;
-  }
+  await db.run(`DELETE FROM product_media WHERE product_id=?`, [productId]);
 }
 
 // ===================== GLOBAL VARIABLES =====================
