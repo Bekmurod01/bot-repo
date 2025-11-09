@@ -596,7 +596,7 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 
 });
 
 // Delete Subcategory
-bot.hears([/🗑️Bo'lim o'chirish/i, /🗑️Удалить подкатегорию/i, /🗑️Bo'lim o'chirish/i, /🗑️Удалить подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
@@ -621,12 +621,11 @@ bot.hears([/🗑️Bo'lim o'chirish/i, /🗑️Удалить подкатего
     );
   } catch (error) {
       console.error("Bo'lim o'chirishda xato:", error);
-      ctx.reply("❌Xatolik yuz berdi");
+      ctx.reply("Xatolik yuz berdi");
   }
 });
-
 // Delete Product
-bot.hears([/🗑️Mahsulot o'chirish/i, /🗑️Удалить товар/i, /🗑️Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
+bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
@@ -651,7 +650,7 @@ bot.hears([/🗑️Mahsulot o'chirish/i, /🗑️Удалить товар/i, /�
     );
   } catch (error) {
     console.error("Mahsulot o'chirishda xato:", error);
-    ctx.reply("❌Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
