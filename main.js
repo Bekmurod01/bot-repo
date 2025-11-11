@@ -426,14 +426,14 @@ bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i, /🛍 Mahsulot 
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `add_prod_to_${c.id}`)];
     });
@@ -505,14 +505,14 @@ bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатего�
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `edit_subcat_${c.id}`)];
     });
@@ -533,14 +533,14 @@ bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /�
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `edit_prod_cat_${c.id}`)];
     });
@@ -597,14 +597,14 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /�
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(`🗑 ${categoryName}`, `delete_subcat_${c.id}`)];
     });
@@ -625,14 +625,14 @@ bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /🗑 Mahsulot o
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
     const lang = userLang[ctx.chat.id] || "uz";
 
-    if (subCategories.rows.length === 0) {
+    if (subCategories.length === 0) {
       return ctx.reply(getText(lang, 'no_subcategories'));
     }
 
-    const categoryButtons = subCategories.rows.map((c) => {
+    const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(categoryName, `delete_prod_cat_${c.id}`)];
     });
