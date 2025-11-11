@@ -562,73 +562,81 @@ bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /�
 });
 
 // ===================== DELETE HANDLERS =====================
-bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Удалить/i], async (ctx) => {
+// bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Удалить/i], async (ctx) => {
+//   if (!isAdmin(ctx.from.id)) return;
+//   setCurrentMenu(ctx.chat.id, 'delete');
+//   const lang = userLang[ctx.chat.id] || "uz";
+//   let inputText = ctx.message.text;
+
+//   try {
+//     // Add Category Flow
+//     if (state.step === "add_category_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "add_category_name_ru";
+//       return ctx.reply(getText(lang, 'enter_category_name_ru'));
+//     }
+
+//     if (state.step === "add_category_name_ru") {
+//       const category = await addCategory(state.data.nameUz, inputText);
+//       state.step = "add_subcategory_name_uz";
+//       state.parentId = category.id;
+//       return ctx.reply(getText(lang, 'enter_subcategory_name_uz'));
+//     }
+
+//     // Add Subcategory Flow
+//     if (state.step === "add_subcategory_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "add_subcategory_name_ru";
+//       return ctx.reply(getText(lang, 'enter_subcategory_name_ru'));
+//     }
+
+//     if (state.step === "add_subcategory_name_ru") {
+//       const subcategory = await addCategory(state.data.nameUz, inputText, state.parentId);
+//       state.step = "add_product_name_uz";
+//       state.categoryId = subcategory.id;
+//       state.data = {}; // Reset data for product
+//       return ctx.reply(getText(lang, 'enter_product_name_uz'));
+//     }
+
+//     // Add Product Flow
+//     if (state.step === "add_product_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "add_product_name_ru";
+//       return ctx.reply(getText(lang, 'enter_product_name_ru'));
+//     }
+
+//     if (state.step === "add_product_name_ru") {
+//       state.data.nameRu = inputText;
+//       state.step = "add_product_description_uz";
+//       return ctx.reply(getText(lang, 'enter_product_description_uz'));
+//     }
+
+//     if (state.step === "add_product_description_uz") {
+//       state.data.descriptionUz = inputText;
+//       state.step = "add_product_description_ru";
+//       return ctx.reply(getText(lang, 'enter_product_description_ru'));
+//     }
+
+//     if (state.step === "add_product_description_ru") {
+//       state.data.descriptionRu = inputText;
+//       state.step = "add_product_media_multiple";
+//       state.data.mediaFiles = [];
+//       return ctx.reply(
+//         getText(lang, 'send_multiple_media'),
+//         Markup.inlineKeyboard([
+//           [Markup.button.callback("✅ Tayyor", "finish_media_upload")],
+//           [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+//         ])
+//       );
+//     }
+bot.hears([/^O'chirish$/i, /^Удалить$/i, /O'chirish/i, /Удалить/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
+
   setCurrentMenu(ctx.chat.id, 'delete');
   const lang = userLang[ctx.chat.id] || "uz";
-  let inputText = ctx.message.text;
 
-  try {
-    // Add Category Flow
-    if (state.step === "add_category_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "add_category_name_ru";
-      return ctx.reply(getText(lang, 'enter_category_name_ru'));
-    }
-
-    if (state.step === "add_category_name_ru") {
-      const category = await addCategory(state.data.nameUz, inputText);
-      state.step = "add_subcategory_name_uz";
-      state.parentId = category.id;
-      return ctx.reply(getText(lang, 'enter_subcategory_name_uz'));
-    }
-
-    // Add Subcategory Flow
-    if (state.step === "add_subcategory_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "add_subcategory_name_ru";
-      return ctx.reply(getText(lang, 'enter_subcategory_name_ru'));
-    }
-
-    if (state.step === "add_subcategory_name_ru") {
-      const subcategory = await addCategory(state.data.nameUz, inputText, state.parentId);
-      state.step = "add_product_name_uz";
-      state.categoryId = subcategory.id;
-      state.data = {}; // Reset data for product
-      return ctx.reply(getText(lang, 'enter_product_name_uz'));
-    }
-
-    // Add Product Flow
-    if (state.step === "add_product_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "add_product_name_ru";
-      return ctx.reply(getText(lang, 'enter_product_name_ru'));
-    }
-
-    if (state.step === "add_product_name_ru") {
-      state.data.nameRu = inputText;
-      state.step = "add_product_description_uz";
-      return ctx.reply(getText(lang, 'enter_product_description_uz'));
-    }
-
-    if (state.step === "add_product_description_uz") {
-      state.data.descriptionUz = inputText;
-      state.step = "add_product_description_ru";
-      return ctx.reply(getText(lang, 'enter_product_description_ru'));
-    }
-
-    if (state.step === "add_product_description_ru") {
-      state.data.descriptionRu = inputText;
-      state.step = "add_product_media_multiple";
-      state.data.mediaFiles = [];
-      return ctx.reply(
-        getText(lang, 'send_multiple_media'),
-        Markup.inlineKeyboard([
-          [Markup.button.callback("✅ Tayyor", "finish_media_upload")],
-          [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-        ])
-      );
-    }
+  await ctx.reply(getText(lang, 'select_edit_option'), getDeleteMenu(lang));
+});
 
     // Edit Category Flow
     if (state.step === "edit_category_name_uz") {
@@ -1389,6 +1397,7 @@ bot.action('finish_media_edit', async (ctx) => {
 });
 
 // ===================== TEXT INPUT HANDLER (SQLITE UCHUN TOZALANGAN) =====================
+// ===================== TEXT INPUT HANDLER (TO‘G‘RI JOYDA) =====================
 bot.on("text", async (ctx) => {
   const state = session[ctx.chat.id];
   if (!state) return;
@@ -1410,7 +1419,6 @@ bot.on("text", async (ctx) => {
         [state.data.nameUz, inputText]
       );
       const categoryId = result.lastID;
-
       state.step = "add_subcategory_name_uz";
       state.parentId = categoryId;
       return ctx.reply(getText(lang, 'enter_subcategory_name_uz'));
@@ -1429,10 +1437,9 @@ bot.on("text", async (ctx) => {
         [state.data.nameUz, inputText, state.parentId]
       );
       const subcategoryId = result.lastID;
-
       state.step = "add_product_name_uz";
       state.categoryId = subcategoryId;
-      state.data = {}; // Reset for product
+      state.data = {};
       return ctx.reply(getText(lang, 'enter_product_name_uz'));
     }
 
@@ -1508,7 +1515,6 @@ bot.on("text", async (ctx) => {
     }
 
     if (state.step === "edit_product_name_ru") {
-      const product = await getProductById(state.productId);
       await db.run(
         `UPDATE products SET name_uz = ?, name_ru = ? WHERE id = ?`,
         [state.data.nameUz, inputText, state.productId]
@@ -1534,7 +1540,7 @@ bot.on("text", async (ctx) => {
     }
 
   } catch (error) {
-    console.error('Text handler xatosi (SQLite):', error);
+    console.error('Text handler xatosi:', error);
     ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
   }
 });
