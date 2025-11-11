@@ -1,26 +1,23 @@
 import { Telegraf, Markup } from "telegraf";
 import { config } from "dotenv";
-import sqlite3 from "sqlite3"; // npm install sqlite3
+import sqlite3 from "sqlite3";
 import { open } from "sqlite";
-import fetch from "node-fetch"; // npm install node-fetch
+import fetch from "node-fetch";
 
-// Environment variables ni yuklash
 config();
 
-// Bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = parseInt(process.env.ADMIN_ID);
 
-// 📂 SQLite ulanish
+// SQLite ulanish
 let db;
 (async () => {
   db = await open({
     filename: "./database.sqlite",
     driver: sqlite3.Database,
   });
-  console.log("✅ SQLite database ga muvaffaqiyatli ulanildi");
+  console.log("SQLite database ga ulanildi");
 
-  // Jadval yaratish
   await db.exec(`
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +52,6 @@ let db;
 })();
 
 // ===================== DATABASE FUNCTIONS =====================
-
-// ===== Categories =====
 async function addCategory(name_uz, name_ru, parent_id = null) {
   const result = await db.run(
     `INSERT INTO categories (name_uz, name_ru, parent_id) VALUES (?, ?, ?)`,
@@ -82,11 +77,7 @@ async function getCategoryById(id) {
 }
 
 async function updateCategory(id, newNameUz, newNameRu) {
-  await db.run(`UPDATE categories SET name_uz=?, name_ru=? WHERE id=?`, [
-    newNameUz,
-    newNameRu,
-    id,
-  ]);
+  await db.run(`UPDATE categories SET name_uz=?, name_ru=? WHERE id=?`, [newNameUz, newNameRu, id]);
 }
 
 async function deleteCategory(id) {
@@ -98,13 +89,12 @@ async function deleteCategory(id) {
   await db.run(`DELETE FROM categories WHERE id=?`, [id]);
 }
 
-// ===== Products =====
 async function addProduct(categoryId, nameUz, nameRu, descriptionUz, descriptionRu) {
   const result = await db.run(
     `INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES (?, ?, ?, ?, ?)`,
     [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
   );
-  return { id: result.lastID, categoryId, nameUz, nameRu, descriptionUz, descriptionRu };
+  return { id: result.lastID };
 }
 
 async function getProductsByCategory(categoryId) {
@@ -123,17 +113,15 @@ async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
 }
 
 async function deleteProduct(id) {
-  await deleteProductMedia(id);
+  await db.run(`DELETE FROM product_media WHERE product_id=?`, [id]);
   await db.run(`DELETE FROM products WHERE id=?`, [id]);
 }
 
-// ===== Product Media =====
 async function addProductMedia(productId, fileId, mediaType, fileSize = null, mimeType = null, orderIndex = 0) {
-  const result = await db.run(
+  await db.run(
     `INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES (?, ?, ?, ?, ?, ?)`,
     [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
   );
-  return { id: result.lastID, productId, fileId, mediaType, fileSize, mimeType, orderIndex };
 }
 
 async function getProductMedia(productId) {
@@ -141,10 +129,6 @@ async function getProductMedia(productId) {
     `SELECT * FROM product_media WHERE product_id=? ORDER BY order_index ASC, created_at ASC`,
     [productId]
   );
-}
-
-async function deleteProductMedia(productId) {
-  await db.run(`DELETE FROM product_media WHERE product_id=?`, [productId]);
 }
 
 // ===================== GLOBAL VARIABLES =====================
@@ -167,104 +151,61 @@ function isAdmin(userId) {
 // ===================== TEXT FUNCTIONS =====================
 function getText(lang, key) {
   const texts = {
-    choose_language: {
-      uz: "🌐 Tilni tanlang:",
-      ru: "🌐 Выберите язык:"
-    },
-    language_selected: {
-      uz: "✅ O'zbek tili tanlandi",
-      ru: "✅ Русский язык выбран"
-    },
-    admin_panel: {
-      uz: "👨‍💼 Admin paneli:",
-      ru: "👨‍💼 Панель администратора:"
-    },
-    not_admin: {
-      uz: "❌ Siz admin emassiz!",
-      ru: "❌ Вы не администратор!"
-    },
-    main_menu: {
-      uz: "🏠 Asosiy menyu:",
-      ru: "🏠 Главное меню:"
-    },
-    company_info: {
-      uz: "🏢 IZOLUX KOMPANIYASI HAQIDA\n\n📍 Manzil: Toshkent shahar\n📞 Telefon: +998 88 980 60 09\n📞 Admin: @Muzropov_Dilmurod\n\n✨ Bizning kompaniya yuqori sifatli izolyatsiya materiallari bilan ta'minlaydi.",
-      ru: "🏢 О КОМПАНИИ IZOLUX\n\n📍 Адрес: г. Ташкент\n📞 Телефон: +998 88 980 60 09\n📞 Admin: @Muzropov_Dilmurod\n\n✨ Наша компания обеспечивает высококачественными изоляционными материалами."
-    },
-    contact_info: {
-      uz: "📞 ALOQA MA'LUMOTLARI\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Manzil: Toshkent shahar\n🕒 Ish vaqti: 9:00 - 18:00\n\n💬 Telegram: @Muzropov_Dilmurod",
-      ru: "📞 КОНТАКТНАЯ ИНФОРМАЦИЯ\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Адрес: г. Ташкент\n🕒 Время работы: 9:00 - 18:00\n\n💬 Telegram: @Muzropov_Dilmurod"
-    },
-    // Admin buttons
-    add_category: { uz: "➕ Kategoriya qo'shish", ru: "➕ Добавить категорию" },
-    add_subcategory: { uz: "📂 Bo'lim qo'shish", ru: "📂 Добавить подкатегорию" },
-    add_product: { uz: "🛍 Mahsulot qo'shish", ru: "🛍 Добавить товар" },
-    edit_menu: { uz: "✏️ Tahrirlash", ru: "✏️ Редактировать" },
-    delete_menu: { uz: "🗑 O'chirish", ru: "🗑 Удалить" },
-    back: { uz: "🔙 Orqaga", ru: "🔙 Назад" },
-    
-    // Edit menu
-    edit_category: { uz: "📁 Kategoriya tahrirlash", ru: "📁 Редактировать категорию" },
-    edit_subcategory: { uz: "📂 Bo'lim tahrirlash", ru: "📂 Редактировать подкатегорию" },
-    edit_product: { uz: "📝 Mahsulot tahrirlash", ru: "📝 Редактировать товар" },
-    edit_product_details: { uz: "🏷 Ma'lumot tahrirlash", ru: "🏷 Редактировать информацию" },
-    edit_product_media: { uz: "🖼 Rasm tahrirlash", ru: "🖼 Редактировать фото" },
-    
-    // Delete menu
-    delete_category: { uz: "🗑 Kategoriya o'chirish", ru: "🗑 Удалить категорию" },
-    delete_subcategory: { uz: "🗑 Bo'lim o'chirish", ru: "🗑 Удалить подкатегорию" },
-    delete_product: { uz: "🗑 Mahsulot o'chirish", ru: "🗑 Удалить товар" },
-    
-    // Product edit submenu
-    edit_product_name: { uz: "📝 Nom tahrirlash", ru: "📝 Редактировать название" },
-    edit_product_description: { uz: "📋 Tavsif tahrirlash", ru: "📋 Редактировать описание" },
-    
-    // Input prompts
-    enter_category_name_uz: { uz: "📁 Kategoriya nomini o'zbekcha kiriting:", ru: "📁 Введите название категории на узбекском:" },
-    enter_category_name_ru: { uz: "📁 Kategoriya nomini ruscha kiriting:", ru: "📁 Введите название категории на русском:" },
-    enter_subcategory_name_uz: { uz: "📂 Bo'lim nomini o'zbekcha kiriting:", ru: "📂 Введите название подкатегории на узбекском:" },
-    enter_subcategory_name_ru: { uz: "📂 Bo'lim nomini ruscha kiriting:", ru: "📂 Введите название подкатегории на русском:" },
-    enter_product_name_uz: { uz: "🏷 Mahsulot nomini o'zbekcha kiriting:", ru: "🏷 Введите название товара на узбекском:" },
-    enter_product_name_ru: { uz: "🏷 Mahsulot nomini ruscha kiriting:", ru: "🏷 Введите название товара на русском:" },
-    enter_product_description_uz: { uz: "📝 Mahsulot tavsifini o'zbekcha kiriting:", ru: "📝 Введите описание товара на узбекском:" },
-    enter_product_description_ru: { uz: "📝 Mahsulot tavsifini ruscha kiriting:", ru: "📝 Введите описание товара на русском:" },
-    
-    // New names for editing
-    enter_new_name_uz: { uz: "✏️ Yangi nomni o'zbekcha kiriting:", ru: "✏️ Введите новое название на узбекском:" },
-    enter_new_name_ru: { uz: "✏️ Yangi nomni ruscha kiriting:", ru: "✏️ Введите новое название на русском:" },
-    enter_new_description_uz: { uz: "✏️ Yangi tavsifni o'zbekcha kiriting:", ru: "✏️ Введите новое описание на узбекском:" },
-    enter_new_description_ru: { uz: "✏️ Yangi tavsifni ruscha kiriting:", ru: "✏️ Введите новое описание на русском:" },
-    
-    // Media
-    send_multiple_media: { uz: "📷📹 Mahsulot rasmlari va videolarini yuboring.\nTugagach 'Tayyor' tugmasini bosing:", ru: "📷📹 Отправьте фото и видео товара.\nПо завершении нажмите 'Готово':" },
-    
-    // Messages
-    category_saved: { uz: "✅ Kategoriya saqlandi!", ru: "✅ Категория сохранена!" },
-    subcategory_saved: { uz: "✅ Bo'lim saqlandi!", ru: "✅ Подкатегория сохранена!" },
-    product_saved: { uz: "✅ Mahsulot saqlandi!", ru: "✅ Товар сохранен!" },
-    category_updated: { uz: "✅ Kategoriya yangilandi!", ru: "✅ Категория обновлена!" },
-    subcategory_updated: { uz: "✅ Bo'lim yangilandi!", ru: "✅ Подкатегория обновлена!" },
-    product_updated: { uz: "✅ Mahsulot yangilandi!", ru: "✅ Товар обновлен!" },
-    media_updated: { uz: "✅ Rasm yangilandi!", ru: "✅ Фото обновлено!" },
-    category_deleted: { uz: "✅ Kategoriya o'chirildi!", ru: "✅ Категория удалена!" },
-    subcategory_deleted: { uz: "✅ Bo'lim o'chirildi!", ru: "✅ Подкатегория удалена!" },
-    product_deleted: { uz: "✅ Mahsulot o'chirildi!", ru: "✅ Товар удален!" },
-    
-    // Selections
-    select_category: { uz: "📂 Kategoriyani tanlang:", ru: "📂 Выберите категорию:" },
-    select_subcategory: { uz: "📂 Bo'limni tanlang:", ru: "📂 Выберите подкатегорию:" },
-    select_product: { uz: "🛍 Mahsulotni tanlang:", ru: "🛍 Выберите товар:" },
-    select_edit_option: { uz: "✏️ Nimani tahrirlaysiz?", ru: "✏️ Что будете редактировать?" },
-    
-    // No items messages
-    no_categories: { uz: "🚫 Kategoriyalar topilmadi", ru: "🚫 Категории не найдены" },
-    no_subcategories: { uz: "🚫 Bo'limlar topilmadi", ru: "🚫 Подкатегории не найдены" },
-    no_products: { uz: "🚫 Bu bo'limda mahsulotlar yo'q", ru: "🚫 В этой подкатегории нет товаров" },
-    
-    // Menu items
-    catalog: { uz: "🛒 Katalog", ru: "🛒 Каталог" },
-    info: { uz: "ℹ️ Ma'lumot", ru: "ℹ️ О компании" },
-    contact: { uz: "📞 Aloqa", ru: "📞 Контакты" }
+    choose_language: { uz: "Tilni tanlang:", ru: "Выберите язык:" },
+    language_selected: { uz: "O'zbek tili tanlandi", ru: "Русский язык выбран" },
+    admin_panel: { uz: "Admin paneli:", ru: "Панель администратора:" },
+    not_admin: { uz: "Siz admin emassiz!", ru: "Вы не администратор!" },
+    main_menu: { uz: "Asosiy menyu:", ru: "Главное меню:" },
+    company_info: { uz: "IZOLUX KOMPANIYASI HAQIDA\n\nManzil: Toshkent shahar\nTelefon: +998 88 980 60 09\nAdmin: @Muzropov_Dilmurod\n\nBizning kompaniya yuqori sifatli izolyatsiya materiallari bilan ta'minlaydi.", ru: "О КОМПАНИИ IZOLUX\n\nАдрес: г. Ташкент\nТелефон: +998 88 980 60 09\nAdmin: @Muzropov_Dilmurod\n\nНаша компания обеспечивает высококачественными изоляционными материалами." },
+    contact_info: { uz: "ALOQA MA'LUMOTLARI\n\nAdmin: Dilmurod\nTelefon: +998 88 980 60 09\nManzil: Toshkent shahar\nIsh vaqti: 9:00 - 18:00\nTelegram: @Muzropov_Dilmurod", ru: "КОНТАКТНАЯ ИНФОРМАЦИЯ\n\nAdmin: Dilmurod\nTelefon: +998 88 980 60 09\nАдрес: г. Ташкент\nВремя работы: 9:00 - 18:00\nTelegram: @Muzropov_Dilmurod" },
+    add_category: { uz: "Kategoriya qo'shish", ru: "Добавить категорию" },
+    add_subcategory: { uz: "Bo'lim qo'shish", ru: "Добавить подкатегорию" },
+    add_product: { uz: "Mahsulot qo'shish", ru: "Добавить товар" },
+    edit_menu: { uz: "Tahrirlash", ru: "Редактировать" },
+    delete_menu: { uz: "O'chirish", ru: "Удалить" },
+    back: { uz: "Orqaga", ru: "Назад" },
+    edit_category: { uz: "Kategoriya tahrirlash", ru: "Редактировать категорию" },
+    edit_subcategory: { uz: "Bo'lim tahrirlash", ru: "Редактировать подкатегорию" },
+    edit_product: { uz: "Mahsulot tahrirlash", ru: "Редактировать товар" },
+    edit_product_name: { uz: "Nom tahrirlash", ru: "Редактировать название" },
+    edit_product_description: { uz: "Tavsif tahrirlash", ru: "Редактировать описание" },
+    edit_product_media: { uz: "Rasm tahrirlash", ru: "Редактировать фото" },
+    delete_category: { uz: "Kategoriya o'chirish", ru: "Удалить категорию" },
+    delete_subcategory: { uz: "Bo'lim o'chirish", ru: "Удалить подкатегорию" },
+    delete_product: { uz: "Mahsulot o'chirish", ru: "Удалить товар" },
+    enter_category_name_uz: { uz: "Kategoriya nomini o'zbekcha kiriting:", ru: "Введите название категории на узбекском:" },
+    enter_category_name_ru: { uz: "Kategoriya nomini ruscha kiriting:", ru: "Введите название категории на русском:" },
+    enter_subcategory_name_uz: { uz: "Bo'lim nomini o'zbekcha kiriting:", ru: "Введите название подкатегории на узбекском:" },
+    enter_subcategory_name_ru: { uz: "Bo'lim nomini ruscha kiriting:", ru: "Введите название подкатегории на русском:" },
+    enter_product_name_uz: { uz: "Mahsulot nomini o'zbekcha kiriting:", ru: "Введите название товара на узбекском:" },
+    enter_product_name_ru: { uz: "Mahsulot nomini ruscha kiriting:", ru: "Введите название товара на русском:" },
+    enter_product_description_uz: { uz: "Mahsulot tavsifini o'zbekcha kiriting:", ru: "Введите описание товара на узбекском:" },
+    enter_product_description_ru: { uz: "Mahsulot tavsifini ruscha kiriting:", ru: "Введите описание товара на русском:" },
+    enter_new_name_uz: { uz: "Yangi nomni o'zbekcha kiriting:", ru: "Введите новое название на узбекском:" },
+    enter_new_name_ru: { uz: "Yangi nomni ruscha kiriting:", ru: "Введите новое название на русском:" },
+    enter_new_description_uz: { uz: "Yangi tavsifni o'zbekcha kiriting:", ru: "Введите новое описание на узбекском:" },
+    enter_new_description_ru: { uz: "Yangi tavsifni ruscha kiriting:", ru: "Введите новое описание на русском:" },
+    send_multiple_media: { uz: "Mahsulot rasmlari va videolarini yuboring.\nTugagach 'Tayyor' tugmasini bosing:", ru: "Отправьте фото и видео товара.\nПо завершении нажмите 'Готово':" },
+    category_saved: { uz: "Kategoriya saqlandi!", ru: "Категория сохранена!" },
+    subcategory_saved: { uz: "Bo'lim saqlandi!", ru: "Подкатегория сохранена!" },
+    product_saved: { uz: "Mahsulot saqlandi!", ru: "Товар сохранен!" },
+    category_updated: { uz: "Kategoriya yangilandi!", ru: "Категория обновлена!" },
+    subcategory_updated: { uz: "Bo'lim yangilandi!", ru: "Подкатегория обновлена!" },
+    product_updated: { uz: "Mahsulot yangilandi!", ru: "Товар обновлен!" },
+    media_updated: { uz: "Rasm yangilandi!", ru: "Фото обновлено!" },
+    category_deleted: { uz: "Kategoriya o'chirildi!", ru: "Категория удалена!" },
+    subcategory_deleted: { uz: "Bo'lim o'chirildi!", ru: "Подкатегория удалена!" },
+    product_deleted: { uz: "Mahsulot o'chirildi!", ru: "Товар удален!" },
+    select_category: { uz: "Kategoriyani tanlang:", ru: "Выберите категорию:" },
+    select_subcategory: { uz: "Bo'limni tanlang:", ru: "Выберите подкатегорию:" },
+    select_product: { uz: "Mahsulotni tanlang:", ru: "Выберите товар:" },
+    select_edit_option: { uz: "Nimani tahrirlaysiz?", ru: "Что будете редактировать?" },
+    no_categories: { uz: "Kategoriyalar topilmadi", ru: "Категории не найдены" },
+    no_subcategories: { uz: "Bo'limlar topilmadi", ru: "Подкатегории не найдены" },
+    no_products: { uz: "Bu bo'limda mahsulotlar yo'q", ru: "В этой подкатегории нет товаров" },
+    catalog: { uz: "Katalog", ru: "Каталог" },
+    info: { uz: "Ma'lumot", ru: "О компании" },
+    contact: { uz: "Aloqa", ru: "Контакты" }
   };
 
   return texts[key] ? texts[key][lang] || texts[key]['uz'] : key;
@@ -313,17 +254,13 @@ function getProductEditMenu(lang) {
 }
 
 // ===================== BOT START =====================
-console.log('🚀 Bot ishga tushmoqda...');
-console.log(`Admin ID: ${adminId} (${typeof adminId})`);
-
-// Language selection
 bot.start((ctx) => {
   const lang = userLang[ctx.chat.id] || 'uz';
   ctx.reply(
     getText(lang, 'choose_language'),
     Markup.inlineKeyboard([
-      [Markup.button.callback("🇺🇿 O'zbek tili", "lang_uz")],
-      [Markup.button.callback("🇷🇺 Русский язык", "lang_ru")]
+      [Markup.button.callback("O'zbek tili", "lang_uz")],
+      [Markup.button.callback("Русский язык", "lang_ru")]
     ])
   );
 });
@@ -332,18 +269,14 @@ bot.action("lang_uz", async (ctx) => {
   userLang[ctx.chat.id] = "uz";
   await ctx.answerCbQuery();
   await ctx.editMessageText(getText('uz', 'language_selected'));
-  setTimeout(() => {
-    ctx.reply(getText('uz', 'main_menu'), getMainMenu('uz'));
-  }, 500);
+  setTimeout(() => ctx.reply(getText('uz', 'main_menu'), getMainMenu('uz')), 500);
 });
 
 bot.action("lang_ru", async (ctx) => {
   userLang[ctx.chat.id] = "ru";
   await ctx.answerCbQuery();
   await ctx.editMessageText(getText('ru', 'language_selected'));
-  setTimeout(() => {
-    ctx.reply(getText('ru', 'main_menu'), getMainMenu('ru'));
-  }, 500);
+  setTimeout(() => ctx.reply(getText('ru', 'main_menu'), getMainMenu('ru')), 500);
 });
 
 // ===================== ADMIN PANEL =====================
@@ -358,18 +291,18 @@ bot.command("admin", async (ctx) => {
 });
 
 // ===================== MAIN MENU HANDLERS =====================
-bot.hears([/Ma'lumot/i, /О компании/i, /ℹ️ Ma'lumot/i, /ℹ️ О компании/i], async (ctx) => {
+bot.hears([/Ma'lumot/i, /О компании/i, /Ma'lumot/i, /О компании/i], async (ctx) => {
   const lang = userLang[ctx.chat.id] || "uz";
   ctx.reply(getText(lang, 'company_info'));
 });
 
-bot.hears([/Aloqa/i, /Контакты/i, /📞 Aloqa/i, /📞 Контакты/i], async (ctx) => {
+bot.hears([/Aloqa/i, /Контакты/i, /Aloqa/i, /Контакты/i], async (ctx) => {
   const lang = userLang[ctx.chat.id] || "uz";
   ctx.reply(getText(lang, 'contact_info'));
 });
 
 // ===================== ADD CATEGORY =====================
-bot.hears([/Kategoriya qo'shish/i, /Добавить категорию/i, /➕ Kategoriya qo'shish/i, /➕ Добавить категорию/i], async (ctx) => {
+bot.hears([/Kategoriya qo'shish/i, /Добавить категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
   session[ctx.chat.id] = { step: "add_category_name_uz", data: {} };
   const lang = userLang[ctx.chat.id] || "uz";
@@ -379,7 +312,7 @@ bot.hears([/Kategoriya qo'shish/i, /Добавить категорию/i, /➕ 
 });
 
 // ===================== ADD SUBCATEGORY =====================
-bot.hears([/Bo'lim qo'shish/i, /Добавить подкатегорию/i, /Bo'lim qo'shish/i, /Добавить подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim qo'shish/i, /Добавить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
@@ -392,28 +325,22 @@ bot.hears([/Bo'lim qo'shish/i, /Добавить подкатегорию/i, /Bo
       ]));
     }
 
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `add_subcat_to_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(name, `add_subcat_to_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    session[ctx.chat.id] = { step: "select_parent_for_subcat" };
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error(error);
+    console.error('Subcategory qo\'shishda xato:', error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
 
 bot.action(/add_subcat_to_(\d+)/, async (ctx) => {
-  const parentId = ctx.match[1];
-  session[ctx.chat.id] = { step: "add_subcategory_name_uz", parentId, data: {} };
+  const categoryId = ctx.match[1];
+  session[ctx.chat.id] = { step: "add_subcategory_name_uz", parentId: categoryId, data: {} };
   const lang = userLang[ctx.chat.id] || "uz";
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
@@ -423,101 +350,52 @@ bot.action(/add_subcat_to_(\d+)/, async (ctx) => {
 });
 
 // ===================== ADD PRODUCT =====================
-bot.hears([
-  /Mahsulot qo'shish/i,
-  /Добавить товар/i,
-  /Mahsulot qo'shish/i,
-  /Добавить товар/i
-], async (ctx) => {
-  const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
-
-  // 1. Admin tekshiruvi
-  if (!isAdmin(userId)) {
-    const lang = userLang[chatId] || "uz";
-    return ctx.reply(getText(lang, 'not_admin'));
-  }
-
-  const lang = userLang[chatId] || "uz";
+bot.hears([/Mahsulot qo'shish/i, /Добавить товар/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
 
   try {
-    // 2. Bo'limlarni olish (subcategories) – SQLite
-    const subCategories = await db.all(`
-      SELECT id, name_uz, name_ru, parent_id 
-      FROM categories 
-      WHERE parent_id IS NOT NULL 
-      ORDER BY id DESC
-    `);
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
+    const lang = userLang[ctx.chat.id] || "uz";
 
-    // 3. Agar bo'lim yo'q bo'lsa
     if (subCategories.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_subcategories'),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-        ])
-      );
+      return ctx.reply(getText(lang, 'no_subcategories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
-    // 4. Tugmalarni yaratish
     const buttons = subCategories.map(c => {
-      const name = lang === 'uz' 
-        ? (c.name_uz || c.name_ru || 'Nomsiz') 
-        : (c.name_ru || c.name_uz || 'Без названия');
+      const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
       return [Markup.button.callback(name, `add_prod_to_${c.id}`)];
     });
-
-    // Orqaga tugmasi
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    // 5. Sessiyani boshlash
-    session[chatId] = {
-      step: "select_category_for_product",
-      data: {}
-    };
-
-    // 6. Foydalanuvchiga xabar
-    await ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(buttons)
-    );
-
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error('Mahsulot qo\'shish boshlashda xato (SQLite):', error);
-    ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
+    console.error('Mahsulot qo\'shishda xato:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 bot.action(/add_prod_to_(\d+)/, async (ctx) => {
   const categoryId = ctx.match[1];
+  session[ctx.chat.id] = { step: "add_product_name_uz", categoryId, data: {} };
   const lang = userLang[ctx.chat.id] || "uz";
-
-  // Sessiyani yangilash
-  session[ctx.chat.id] = {
-    step: "add_product_name_uz",
-    categoryId,
-    data: {}  // Nom, tavsif uchun
-  };
-
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
-
-  ctx.reply(
-    getText(lang, 'enter_product_name_uz'),
-    Markup.inlineKeyboard([[Markup.button.callback(getText(lang, 'back'), "admin_back")]])
-  );
+  ctx.reply(getText(lang, 'enter_product_name_uz'), Markup.inlineKeyboard([
+    [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+  ]));
 });
 
 // ===================== EDIT HANDLERS =====================
-bot.hears([/^Tahrirlash$/i, /^Редактировать$/i, /✏️ Tahrirlash/i, /✏️ Редактировать/i], async (ctx) => {
+bot.hears([/Tahrirlash/i, /Редактировать/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
   setCurrentMenu(ctx.chat.id, 'edit');
   const lang = userLang[ctx.chat.id] || "uz";
   await ctx.reply(getText(lang, 'select_edit_option'), getEditMenu(lang));
 });
 
-// Edit Category
-bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i, /📁 Kategoriya tahrirlash/i, /📁 Редактировать категорию/i], async (ctx) => {
+bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
@@ -525,80 +403,61 @@ bot.hears([/Kategoriya tahrirlash/i, /Редактировать категор�
     const lang = userLang[ctx.chat.id] || "uz";
 
     if (categories.length === 0) {
-      return ctx.reply(getText(lang, 'no_categories'));
+      return ctx.reply(getText(lang, 'no_categories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `edit_cat_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(name, `edit_cat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Kategoriya tahrirlashda xato:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Edit Subcategory
 bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
-  const lang = userLang[ctx.chat.id] || "uz";
-
   try {
-    // SQLite: faqat parent_id IS NOT NULL bo'lganlarni olamiz
-    const subCategories = await db.all(`
-      SELECT id, name_uz, name_ru, parent_id 
-      FROM categories 
-      WHERE parent_id IS NOT NULL 
-      ORDER BY id DESC
-    `);
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
+    const lang = userLang[ctx.chat.id] || "uz";
 
     if (subCategories.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_subcategories'),
-        Markup.inlineKeyboard([[Markup.button.callback(getText(lang, 'back'), "admin_back")]])
-      );
+      return ctx.reply(getText(lang, 'no_subcategories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
     const buttons = subCategories.map(c => {
       const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`Bo'lim: ${name}`, `edit_subcat_${c.id}`)];
+      return [Markup.button.callback(name, `edit_subcat_${c.id}`)];
     });
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
-
   } catch (error) {
     console.error('Bo\'lim tahrirlashda xato:', error);
-    ctx.reply("❌Xatolik yuz berdi.");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Edit Product
 bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
-  const lang = userLang[ctx.chat.id] || "uz";
-
   try {
-    const subCategories = await db.all(`
-      SELECT id, name_uz, name_ru 
-      FROM categories 
-      WHERE parent_id IS NOT NULL 
-      ORDER BY id DESC
-    `);
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
+    const lang = userLang[ctx.chat.id] || "uz";
 
     if (subCategories.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_subcategories'),
-        Markup.inlineKeyboard([[Markup.button.callback(getText(lang, 'back'), "admin_back")]])
-      );
+      return ctx.reply(getText(lang, 'no_subcategories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
     const buttons = subCategories.map(c => {
@@ -608,23 +467,21 @@ bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i], as
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
-
   } catch (error) {
     console.error('Mahsulot tahrirlashda xato:', error);
-    ctx.reply("Xatolik yuz berdi.");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // ===================== DELETE HANDLERS =====================
-bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Удалить/i], async (ctx) => {
+bot.hears([/O'chirish/i, /Удалить/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
   setCurrentMenu(ctx.chat.id, 'delete');
   const lang = userLang[ctx.chat.id] || "uz";
   await ctx.reply(getText(lang, 'select_edit_option'), getDeleteMenu(lang));
 });
 
-// Delete Category
-bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 Kategoriya o'chirish/i, /🗑 Удалить категорию/i], async (ctx) => {
+bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
@@ -632,79 +489,61 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 
     const lang = userLang[ctx.chat.id] || "uz";
 
     if (categories.length === 0) {
-      return ctx.reply(getText(lang, 'no_categories'));
+      return ctx.reply(getText(lang, 'no_categories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`🗑 ${categoryName}`, `delete_cat_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(`${name}`, `delete_cat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Kategoriya o\'chirishda xato:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Delete Subcategory
 bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
-  const lang = userLang[ctx.chat.id] || "uz";
-
   try {
-    const subCategories = await db.all(`
-      SELECT id, name_uz, name_ru 
-      FROM categories 
-      WHERE parent_id IS NOT NULL 
-      ORDER BY id DESC
-    `);
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
+    const lang = userLang[ctx.chat.id] || "uz";
 
     if (subCategories.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_subcategories'),
-        Markup.inlineKeyboard([[Markup.button.callback(getText(lang, 'back'), "admin_back")]])
-      );
+      return ctx.reply(getText(lang, 'no_subcategories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
     const buttons = subCategories.map(c => {
       const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`Bo'lim: ${name}`, `delete_subcat_${c.id}`)];
+      return [Markup.button.callback(`${name}`, `delete_subcat_${c.id}`)];
     });
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
-
   } catch (error) {
     console.error('Bo\'lim o\'chirishda xato:', error);
-    ctx.reply("Xatolik yuz berdi.");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Delete Product
 bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
-  const lang = userLang[ctx.chat.id] || "uz";
-
   try {
-    const subCategories = await db.all(`
-      SELECT id, name_uz, name_ru 
-      FROM categories 
-      WHERE parent_id IS NOT NULL 
-      ORDER BY id DESC
-    `);
+    const subCategories = await db.all(`SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC`);
+    const lang = userLang[ctx.chat.id] || "uz";
 
     if (subCategories.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_subcategories'),
-        Markup.inlineKeyboard([[Markup.button.callback(getText(lang, 'back'), "admin_back")]])
-      );
+      return ctx.reply(getText(lang, 'no_subcategories'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
     const buttons = subCategories.map(c => {
@@ -714,15 +553,14 @@ bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => 
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
-
   } catch (error) {
     console.error('Mahsulot o\'chirishda xato:', error);
-    ctx.reply("Xatolik yuz berdi.");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // ===================== BACK BUTTON =====================
-bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], async (ctx) => {
+bot.hears([/Orqaga/i, /Назад/i], async (ctx) => {
   const lang = userLang[ctx.chat.id] || "uz";
   const currentMenu = getCurrentMenu(ctx.chat.id);
 
@@ -734,17 +572,14 @@ bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], as
       setCurrentMenu(ctx.chat.id, 'admin');
       ctx.reply(getText(lang, 'admin_panel'), getAdminMenu(lang));
       break;
-
     case 'admin':
       setCurrentMenu(ctx.chat.id, 'main');
       ctx.reply(getText(lang, 'main_menu'), getMainMenu(lang));
       break;
-
     case 'product_edit':
       setCurrentMenu(ctx.chat.id, 'edit');
       ctx.reply(getText(lang, 'select_edit_option'), getEditMenu(lang));
       break;
-
     default:
       setCurrentMenu(ctx.chat.id, 'main');
       ctx.reply(getText(lang, 'main_menu'), getMainMenu(lang));
@@ -752,7 +587,7 @@ bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], as
 });
 
 // ===================== CATALOG HANDLER =====================
-bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/i], async (ctx) => {
+bot.hears([/Katalog/i, /Каталог/i], async (ctx) => {
   setCurrentMenu(ctx.chat.id, 'catalog');
   try {
     const categories = await getRootCategories();
@@ -762,31 +597,25 @@ bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/
       return ctx.reply(getText(lang, 'no_categories'));
     }
 
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `view_cat_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(name, `view_cat_${c.id}`)];
     });
-
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
 
     session[ctx.chat.id] = { categoryPath: [] };
 
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Katalog xatosi:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// ===================== CALLBACK ACTION HANDLERS =====================
-
-// Edit Category Action
+// ===================== CALLBACK ACTIONS =====================
 bot.action(/edit_cat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  session[ctx.chat.id] = { step: "edit_category_name_uz", categoryId };
+  const id = ctx.match[1];
+  session[ctx.chat.id] = { step: "edit_category_name_uz", categoryId: id };
   const lang = userLang[ctx.chat.id] || "uz";
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
@@ -795,10 +624,9 @@ bot.action(/edit_cat_(\d+)/, async (ctx) => {
   ]));
 });
 
-// Edit Subcategory Action
 bot.action(/edit_subcat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  session[ctx.chat.id] = { step: "edit_subcategory_name_uz", categoryId };
+  const id = ctx.match[1];
+  session[ctx.chat.id] = { step: "edit_subcategory_name_uz", categoryId: id };
   const lang = userLang[ctx.chat.id] || "uz";
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
@@ -807,395 +635,347 @@ bot.action(/edit_subcat_(\d+)/, async (ctx) => {
   ]));
 });
 
-// Edit Product Category Selection
 bot.action(/edit_prod_cat_(\d+)/, async (ctx) => {
-  const chatId = ctx.chat.id;
-  const categoryId = parseInt(ctx.match[1], 10);
-  const lang = userLang[chatId] || "uz";
-
-  // 1. categoryId to'g'ri raqam ekanligini tekshirish
-  if (isNaN(categoryId)) {
-    await ctx.answerCbQuery("Noto‘g‘ri ID");
-    return;
-  }
-
+  const categoryId = ctx.match[1];
   try {
-    // 2. Mahsulotlarni olish – SQLite so'rovi
-    const products = await db.all(`
-      SELECT id, name_uz, name_ru, description_uz, description_ru 
-      FROM products 
-      WHERE category_id = ? 
-      ORDER BY id DESC
-    `, [categoryId]);
+    const products = await getProductsByCategory(categoryId);
+    const lang = userLang[ctx.chat.id] || "uz";
 
-    await ctx.answerCbQuery(); // Tugma bosilganini tasdiqlash
-    await ctx.deleteMessage();  // Oldingi xabarni o‘chirish
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
 
-    // 3. Agar mahsulot yo‘q bo‘lsa
     if (products.length === 0) {
-      return ctx.reply(
-        getText(lang, 'no_products'),
-        Markup.inlineKeyboard([
-          [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-        ])
-      );
+      return ctx.reply(getText(lang, 'no_products'), Markup.inlineKeyboard([
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
     }
 
-    // 4. Tugmalarni yaratish
-    const productButtons = products.map((p, index) => {
-      const productName = lang === 'uz' 
-        ? (p.name_uz || p.name_ru || 'Nomsiz') 
-        : (p.name_ru || p.name_uz || 'Без названия');
-      return [Markup.button.callback(`${index + 1}. ${productName}`, `edit_prod_${p.id}`)];
+    const buttons = products.map((p, i) => {
+      const name = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
+      return [Markup.button.callback(`${i + 1}. ${name}`, `edit_prod_${p.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    // Orqaga tugmasi
-    productButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    // 5. Foydalanuvchiga xabar
-    await ctx.reply(
-      getText(lang, 'select_product'),
-      Markup.inlineKeyboard(productButtons)
-    );
-
+    ctx.reply(getText(lang, 'select_product'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error('Mahsulot ro\'yxatini olishda xato (SQLite):', error);
-    await ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
+    console.error('Mahsulot ro\'yxatida xato:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Edit Product Selection - Show Edit Options
 bot.action(/edit_prod_(\d+)/, async (ctx) => {
   const productId = ctx.match[1];
   session[ctx.chat.id] = { productId, step: "select_product_edit_option" };
   const lang = userLang[ctx.chat.id] || "uz";
   setCurrentMenu(ctx.chat.id, 'product_edit');
-  
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
-  
   ctx.reply(getText(lang, 'select_edit_option'), getProductEditMenu(lang));
 });
 
-// Product Edit Options
-bot.hears([/Nom tahrirlash/i, /Редактировать название/i, /📝 Nom tahrirlash/i, /📝 Редактировать название/i], async (ctx) => {
-  if (!isAdmin(ctx.from.id)) return;
-  
+bot.hears([/Nom tahrirlash/i, /Редактировать название/i], async (ctx) => {
   const state = session[ctx.chat.id];
-  if (!state || !state.productId) return;
-  
+  if (!state?.productId) return;
   state.step = "edit_product_name_uz";
   state.data = {};
   const lang = userLang[ctx.chat.id] || "uz";
-  
   ctx.reply(getText(lang, 'enter_new_name_uz'), Markup.inlineKeyboard([
     [Markup.button.callback(getText(lang, 'back'), "admin_back")]
   ]));
 });
 
-bot.hears([/Tavsif tahrirlash/i, /Редактировать описание/i, /📋 Tavsif tahrirlash/i, /📋 Редактировать описание/i], async (ctx) => {
-  if (!isAdmin(ctx.from.id)) return;
-  
+bot.hears([/Tavsif tahrirlash/i, /Редактировать описание/i], async (ctx) => {
   const state = session[ctx.chat.id];
-  if (!state || !state.productId) return;
-  
+  if (!state?.productId) return;
   state.step = "edit_product_description_uz";
   state.data = {};
   const lang = userLang[ctx.chat.id] || "uz";
-  
   ctx.reply(getText(lang, 'enter_new_description_uz'), Markup.inlineKeyboard([
     [Markup.button.callback(getText(lang, 'back'), "admin_back")]
   ]));
 });
 
-bot.hears([/Rasm tahrirlash/i, /Редактировать фото/i, /🖼 Rasm tahrirlash/i, /🖼 Редактировать фото/i], async (ctx) => {
-  if (!isAdmin(ctx.from.id)) return;
-  
+bot.hears([/Rasm tahrirlash/i, /Редактировать фото/i], async (ctx) => {
   const state = session[ctx.chat.id];
-  if (!state || !state.productId) return;
-  
-  try {
-    const existingMedia = await getProductMedia(state.productId);
-    const lang = userLang[ctx.chat.id] || "uz";
-
-    state.step = "edit_product_media_multiple";
-    state.data = { mediaFiles: [] };
-
-    let mediaInfo = "";
-    if (existingMedia.length > 0) {
-      const photoCount = existingMedia.filter(m => m.media_type === 'photo').length;
-      const videoCount = existingMedia.filter(m => m.media_type === 'video').length;
-      mediaInfo = `\n\n📊 Hozirgi media: ${existingMedia.length} ta (📸 ${photoCount}, 🎬 ${videoCount})`;
-    }
-
-    ctx.reply(
-      `🖼📹 Yangi media yuklang. Barcha eski medialar almashtiriladi.${mediaInfo}\n\n➕ Rasm va videolarni yuboring, keyin 'Tayyor' tugmasini bosing.`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("✅ Tayyor, saqlash", "finish_media_edit")],
-        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-      ])
-    );
-  } catch (error) {
-    console.error('Media tahrirlash xatosi:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
+  if (!state?.productId) return;
+  state.step = "edit_product_media_multiple";
+  state.data = { mediaFiles: [] };
+  const lang = userLang[ctx.chat.id] || "uz";
+  ctx.reply(
+    `Yangi media yuklang. Eski medialar o'chiriladi.\nRasm/videoni yuboring, keyin "Tayyor" ni bosing.`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback("Tayyor", "finish_media_edit")],
+      [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+    ])
+  );
 });
 
-// Delete Actions
 bot.action(/delete_cat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  try {
-    await deleteCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-    ctx.reply(getText(lang, 'category_deleted'));
-  } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
+  const id = ctx.match[1];
+  await deleteCategory(id);
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'category_deleted'), getAdminMenu(lang));
 });
 
 bot.action(/delete_subcat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  try {
-    await deleteCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-    ctx.reply(getText(lang, 'subcategory_deleted'));
-  } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
+  const id = ctx.match[1];
+  await deleteCategory(id);
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'subcategory_deleted'), getAdminMenu(lang));
 });
 
 bot.action(/delete_prod_cat_(\d+)/, async (ctx) => {
   const categoryId = ctx.match[1];
-  try {
-    const products = await getProductsByCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
+  const products = await getProductsByCategory(categoryId);
+  const lang = userLang[ctx.chat.id] || "uz";
 
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
 
-    if (products.length === 0) {
-      return ctx.reply(getText(lang, 'no_products'));
-    }
-
-    const productButtons = products.map((p, index) => {
-      const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
-      return [Markup.button.callback(`🗑 ${index + 1}. ${productName || 'Nomsiz'}`, `delete_prod_${p.id}`)];
-    });
-
-    productButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_product'),
-      Markup.inlineKeyboard(productButtons)
-    );
-  } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+  if (products.length === 0) {
+    return ctx.reply(getText(lang, 'no_products'));
   }
+
+  const buttons = products.map((p, i) => {
+    const name = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
+    return [Markup.button.callback(`${i + 1}. ${name}`, `delete_prod_${p.id}`)];
+  });
+  buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
+
+  ctx.reply(getText(lang, 'select_product'), Markup.inlineKeyboard(buttons));
 });
 
 bot.action(/delete_prod_(\d+)/, async (ctx) => {
-  const productId = ctx.match[1];
+  const id = ctx.match[1];
+  await deleteProduct(id);
+  const lang = userLang[ctx.chat.id] || "uz";
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+  ctx.reply(getText(lang, 'product_deleted'), getAdminMenu(lang));
+});
+
+// ===================== MEDIA & TEXT HANDLERS =====================
+bot.on(['photo', 'video'], async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state || !['add_product_media_multiple', 'edit_product_media_multiple'].includes(state.step)) return;
+
+  const mediaType = ctx.message.photo ? 'photo' : 'video';
+  const file = mediaType === 'photo' ? ctx.message.photo.pop() : ctx.message.video;
+
+  if (!state.data.mediaFiles) state.data.mediaFiles = [];
+  state.data.mediaFiles.push({
+    fileId: file.file_id,
+    mediaType,
+    fileSize: file.file_size,
+    mimeType: file.mime_type
+  });
+
+  const count = state.data.mediaFiles.length;
+  const lang = userLang[ctx.chat.id] || "uz";
+  ctx.reply(`${count}-ta media qabul qilindi. Yana yuboring yoki "Tayyor" ni bosing.`);
+});
+
+bot.action('finish_media_upload', async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state || state.step !== 'add_product_media_multiple') return;
+
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+
+  const { nameUz, nameRu, descriptionUz, descriptionRu } = state.data;
+  const product = await addProduct(state.categoryId, nameUz, nameRu, descriptionUz, descriptionRu);
+
+  for (let i = 0; i < state.data.mediaFiles.length; i++) {
+    const m = state.data.mediaFiles[i];
+    await addProductMedia(product.id, m.fileId, m.mediaType, m.fileSize, m.mimeType, i);
+  }
+
+  delete session[ctx.chat.id];
+  ctx.reply(getText(userLang[ctx.chat.id] || "uz", 'product_saved'), getAdminMenu(userLang[ctx.chat.id] || "uz"));
+});
+
+bot.action('finish_media_edit', async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state || state.step !== 'edit_product_media_multiple') return;
+
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
+
+  await db.run(`DELETE FROM product_media WHERE product_id = ?`, [state.productId]);
+
+  for (let i = 0; i < state.data.mediaFiles.length; i++) {
+    const m = state.data.mediaFiles[i];
+    await addProductMedia(state.productId, m.fileId, m.mediaType, m.fileSize, m.mimeType, i);
+  }
+
+  delete session[ctx.chat.id];
+  ctx.reply(getText(userLang[ctx.chat.id] || "uz", 'media_updated'), getAdminMenu(userLang[ctx.chat.id] || "uz"));
+});
+
+bot.on("text", async (ctx) => {
+  const state = session[ctx.chat.id];
+  if (!state) return;
+
+  const lang = userLang[ctx.chat.id] || "uz";
+  const text = ctx.message.text.trim();
+
   try {
-    await deleteProduct(productId);
-    const lang = userLang[ctx.chat.id] || "uz";
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-    ctx.reply(getText(lang, 'product_deleted'));
+    if (state.step === "add_category_name_uz") {
+      state.data.nameUz = text;
+      state.step = "add_category_name_ru";
+      return ctx.reply(getText(lang, 'enter_category_name_ru'));
+    }
+    if (state.step === "add_category_name_ru") {
+      await addCategory(state.data.nameUz, text);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'category_saved'), getAdminMenu(lang));
+    }
+    if (state.step === "add_subcategory_name_uz") {
+      state.data.nameUz = text;
+      state.step = "add_subcategory_name_ru";
+      return ctx.reply(getText(lang, 'enter_subcategory_name_ru'));
+    }
+    if (state.step === "add_subcategory_name_ru") {
+      await addCategory(state.data.nameUz, text, state.parentId);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'subcategory_saved'), getAdminMenu(lang));
+    }
+    if (state.step === "add_product_name_uz") {
+      state.data.nameUz = text;
+      state.step = "add_product_name_ru";
+      return ctx.reply(getText(lang, 'enter_product_name_ru'));
+    }
+    if (state.step === "add_product_name_ru") {
+      state.data.nameRu = text;
+      state.step = "add_product_description_uz";
+      return ctx.reply(getText(lang, 'enter_product_description_uz'));
+    }
+    if (state.step === "add_product_description_uz") {
+      state.data.descriptionUz = text;
+      state.step = "add_product_description_ru";
+      return ctx.reply(getText(lang, 'enter_product_description_ru'));
+    }
+    if (state.step === "add_product_description_ru") {
+      state.data.descriptionRu = text;
+      state.step = "add_product_media_multiple";
+      state.data.mediaFiles = [];
+      return ctx.reply(getText(lang, 'send_multiple_media'), Markup.inlineKeyboard([
+        [Markup.button.callback("Tayyor", "finish_media_upload")],
+        [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+      ]));
+    }
+    if (state.step === "edit_category_name_uz") {
+      state.data.nameUz = text;
+      state.step = "edit_category_name_ru";
+      return ctx.reply(getText(lang, 'enter_new_name_ru'));
+    }
+    if (state.step === "edit_category_name_ru") {
+      await updateCategory(state.categoryId, state.data.nameUz, text);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'category_updated'), getAdminMenu(lang));
+    }
+    if (state.step === "edit_subcategory_name_uz") {
+      state.data.nameUz = text;
+      state.step = "edit_subcategory_name_ru";
+      return ctx.reply(getText(lang, 'enter_new_name_ru'));
+    }
+    if (state.step === "edit_subcategory_name_ru") {
+      await updateCategory(state.categoryId, state.data.nameUz, text);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'subcategory_updated'), getAdminMenu(lang));
+    }
+    if (state.step === "edit_product_name_uz") {
+      state.data.nameUz = text;
+      state.step = "edit_product_name_ru";
+      return ctx.reply(getText(lang, 'enter_new_name_ru'));
+    }
+    if (state.step === "edit_product_name_ru") {
+      const product = await getProductById(state.productId);
+      await updateProduct(state.productId, state.data.nameUz, text, product.description_uz, product.description_ru);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'product_updated'), getAdminMenu(lang));
+    }
+    if (state.step === "edit_product_description_uz") {
+      state.data.descriptionUz = text;
+      state.step = "edit_product_description_ru";
+      return ctx.reply(getText(lang, 'enter_new_description_ru'));
+    }
+    if (state.step === "edit_product_description_ru") {
+      const product = await getProductById(state.productId);
+      await updateProduct(state.productId, product.name_uz, product.name_ru, state.data.descriptionUz, text);
+      delete session[ctx.chat.id];
+      return ctx.reply(getText(lang, 'product_updated'), getAdminMenu(lang));
+    }
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Text handler xatosi:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
-// Catalog View Actions
+// ===================== CATALOG VIEW =====================
 bot.action(/view_cat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  try {
-    const category = await getCategoryById(categoryId);
-    const subCategories = await getSubCategories(categoryId);
-    const products = await getProductsByCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
+  const id = ctx.match[1];
+  const category = await getCategoryById(id);
+  const subCats = await getSubCategories(id);
+  const products = await getProductsByCategory(id);
+  const lang = userLang[ctx.chat.id] || "uz";
 
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
 
-    if (!session[ctx.chat.id]) session[ctx.chat.id] = {};
-    if (!session[ctx.chat.id].categoryPath) session[ctx.chat.id].categoryPath = [];
+  if (!session[ctx.chat.id]?.categoryPath) session[ctx.chat.id].categoryPath = [];
+  const path = session[ctx.chat.id].categoryPath;
+  if (!path.some(c => c.id == id)) path.push(category);
 
-    const path = session[ctx.chat.id].categoryPath;
-    if (!path.some(cat => cat.id == categoryId)) {
-      path.push(category);
-    }
+  const buttons = [];
+  subCats.forEach(c => {
+    const name = lang === 'uz' ? c.name_uz : c.name_ru;
+    buttons.push([Markup.button.callback(` ${name}`, `view_cat_${c.id}`)]);
+  });
+  products.forEach((p, i) => {
+    const name = lang === 'uz' ? p.name_uz : p.name_ru;
+    buttons.push([Markup.button.callback(`${i + 1}. ${name}`, `view_product_${p.id}`)]);
+  });
+  buttons.push([Markup.button.callback(getText(lang, 'back'), path.length > 1 ? `back_to_cat_${path[path.length-2].id}` : "back_to_menu")]);
 
-    const buttons = [];
-
-    if (subCategories.length > 0) {
-      subCategories.forEach((c) => {
-        const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-        buttons.push([Markup.button.callback(`📁 ${categoryName}`, `view_cat_${c.id}`)]);
-      });
-    }
-
-    if (products.length > 0) {
-      products.forEach((p, index) => {
-        const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
-        buttons.push([Markup.button.callback(`${index + 1}. ${productName || 'Nomsiz'}`, `view_product_${p.id}`)]);
-      });
-    }
-
-    if (path.length > 1) {
-      const parentCategory = path[path.length - 2];
-      buttons.push([Markup.button.callback(getText(lang, 'back'), `back_to_cat_${parentCategory.id}`)]);
-    } else {
-      buttons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
-    }
-
-    const currentCategoryName = lang === 'uz' ? (category.name_uz || category.name_ru) : (category.name_ru || category.name_uz);
-
-    if (subCategories.length > 0 || products.length > 0) {
-      ctx.reply(
-        `📂 ${currentCategoryName}`,
-        Markup.inlineKeyboard(buttons)
-      );
-    } else {
-      ctx.reply(
-        getText(lang, 'no_products'),
-        Markup.inlineKeyboard(buttons)
-      );
-    }
-
-  } catch (error) {
-    console.error('Katalog ko\'rishda xato:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
+  ctx.reply(` ${lang === 'uz' ? category.name_uz : category.name_ru}`, Markup.inlineKeyboard(buttons));
 });
 
 bot.action(/view_product_(\d+)/, async (ctx) => {
-  const productId = ctx.match[1];
-  try {
-    const product = await getProductById(productId);
-    const lang = userLang[ctx.chat.id] || "uz";
+  const id = ctx.match[1];
+  const product = await getProductById(id);
+  const media = await getProductMedia(id);
+  const lang = userLang[ctx.chat.id] || "uz";
 
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
+  await ctx.answerCbQuery();
+  await ctx.deleteMessage();
 
-    const productName = lang === 'uz' ? (product.name_uz || product.name_ru) : (product.name_ru || product.name_uz);
-    const productDescription = lang === 'uz' ? (product.description_uz || product.description_ru) : (product.description_ru || product.description_uz);
+  const caption = `${lang === 'uz' ? product.name_uz : product.name_ru}\n\n${lang === 'uz' ? product.description_uz : product.description_ru}`;
+  const buttons = [[Markup.button.callback(getText(lang, 'back'), session[ctx.chat.id]?.categoryPath?.length > 0 ? `back_to_cat_${session[ctx.chat.id].categoryPath[session[ctx.chat.id].categoryPath.length-1].id}` : "back_to_menu")]];
 
-    const caption = `🏷 ${productName}\n\n📝 ${productDescription}`;
-
-    const mediaList = await getProductMedia(productId);
-
-    const path = session[ctx.chat.id]?.categoryPath || [];
-    const buttons = [];
-    if (path.length > 0) {
-      const parentCategory = path[path.length - 1];
-      buttons.push([Markup.button.callback(getText(lang, 'back'), `back_to_cat_${parentCategory.id}`)]);
-    } else {
-      buttons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
-    }
-
-    if (mediaList.length === 0) {
-      await ctx.reply(caption, Markup.inlineKeyboard(buttons));
-      return;
-    }
-
-    if (mediaList.length === 1) {
-      const media = mediaList[0];
-      if (media.media_type === 'video') {
-        await ctx.replyWithVideo(media.file_id, {
-          caption,
-          reply_markup: Markup.inlineKeyboard(buttons).reply_markup
-        });
-      } else if (media.media_type === 'photo') {
-        await ctx.replyWithPhoto(media.file_id, {
-          caption,
-          reply_markup: Markup.inlineKeyboard(buttons).reply_markup
-        });
-      }
-    } else {
-      const mediaGroup = mediaList.map((media, index) => ({
-        type: media.media_type,
-        media: media.file_id,
-        caption: index === 0 ? caption : undefined
-      }));
-
-      await ctx.replyWithMediaGroup(mediaGroup);
-      await ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
-    }
-
-  } catch (error) {
-    console.error(`Mahsulot ${productId} ko'rishda xato:`, error);
-    ctx.reply("❌ Xatolik yuz berdi");
+  if (media.length === 0) {
+    ctx.reply(caption, Markup.inlineKeyboard(buttons));
+  } else if (media.length === 1) {
+    const m = media[0];
+    if (m.media_type === 'photo') ctx.replyWithPhoto(m.file_id, { caption, reply_markup: Markup.inlineKeyboard(buttons).reply_markup });
+    else ctx.replyWithVideo(m.file_id, { caption, reply_markup: Markup.inlineKeyboard(buttons).reply_markup });
+  } else {
+    const group = media.map((m, i) => ({ type: m.media_type, media: m.file_id, caption: i === 0 ? caption : undefined }));
+    await ctx.replyWithMediaGroup(group);
+    ctx.reply("◀️", Markup.inlineKeyboard(buttons));
   }
 });
 
-// Navigation Actions
 bot.action(/back_to_cat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
-  try {
-    const category = await getCategoryById(categoryId);
-    const subCategories = await getSubCategories(categoryId);
-    const products = await getProductsByCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
-
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-
-    if (!session[ctx.chat.id]) session[ctx.chat.id] = {};
-    if (!session[ctx.chat.id].categoryPath) session[ctx.chat.id].categoryPath = [];
-
-    const path = session[ctx.chat.id].categoryPath;
-    const categoryIndex = path.findIndex(cat => cat.id == categoryId);
-    if (categoryIndex !== -1) {
-      session[ctx.chat.id].categoryPath = path.slice(0, categoryIndex + 1);
-    }
-
-    const buttons = [];
-
-    if (subCategories.length > 0) {
-      subCategories.forEach((c) => {
-        const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-        buttons.push([Markup.button.callback(`📁 ${categoryName}`, `view_cat_${c.id}`)]);
-      });
-    }
-
-    if (products.length > 0) {
-      products.forEach((p, index) => {
-        const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
-        buttons.push([Markup.button.callback(`${index + 1}. ${productName || 'Nomsiz'}`, `view_product_${p.id}`)]);
-      });
-    }
-
-    const currentPath = session[ctx.chat.id].categoryPath;
-    if (currentPath.length > 1) {
-      const parentCategory = currentPath[currentPath.length - 2];
-      buttons.push([Markup.button.callback(getText(lang, 'back'), `back_to_cat_${parentCategory.id}`)]);
-    } else {
-      buttons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
-    }
-
-    const currentCategoryName = lang === 'uz' ? (category.name_uz || category.name_ru) : (category.name_ru || category.name_uz);
-
-    if (subCategories.length > 0 || products.length > 0) {
-      ctx.reply(
-        `📂 ${currentCategoryName}`,
-        Markup.inlineKeyboard(buttons)
-      );
-    } else {
-      ctx.reply(
-        getText(lang, 'no_products'),
-        Markup.inlineKeyboard(buttons)
-      );
-    }
-
-  } catch (error) {
-    console.error('Orqaga qaytishda xato:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
+  const id = ctx.match[1];
+  const index = session[ctx.chat.id].categoryPath.findIndex(c => c.id == id);
+  if (index !== -1) session[ctx.chat.id].categoryPath = session[ctx.chat.id].categoryPath.slice(0, index + 1);
+  ctx.callbackQuery.data = `view_cat_${id}`;
+  bot.handleUpdate(ctx.update);
 });
 
 bot.action("back_to_menu", async (ctx) => {
@@ -1216,326 +996,5 @@ bot.action("admin_back", async (ctx) => {
   ctx.reply(getText(lang, 'admin_panel'), getAdminMenu(lang));
 });
 
-// ===================== MEDIA HANDLERS =====================
-bot.on(['photo', 'video'], async (ctx) => {
-  const chatId = ctx.chat.id;
-  const state = session[chatId];
-
-  // Add va Edit bosqichlarini tekshirish
-  const validSteps = ['add_product_media_multiple', 'edit_product_media_multiple'];
-  if (!state || !validSteps.includes(state.step)) return;
-
-  const mediaType = ctx.message.photo ? 'photo' : 'video';
-  const file = mediaType === 'photo' ? ctx.message.photo.pop() : ctx.message.video;  // Eng yuqori sifat
-
-  if (!state.data.mediaFiles) state.data.mediaFiles = [];
-
-  state.data.mediaFiles.push({
-    fileId: file.file_id,
-    mediaType,
-    fileSize: file.file_size || null,
-    mimeType: file.mime_type || null
-  });
-
-  const count = state.data.mediaFiles.length;
-  const lang = userLang[chatId] || "uz";
-  const typeText = lang === 'uz' ? (mediaType === 'photo' ? 'rasm' : 'video') : (mediaType === 'photo' ? 'фото' : 'видео');
-
-  ctx.reply(
-    `✅ ${count}-ta ${typeText} qabul qilindi.\nYana yuboring yoki "Tayyor" ni bosing.`,
-    Markup.inlineKeyboard([
-      [Markup.button.callback("✅ Tayyor", state.step === 'add_product_media_multiple' ? "finish_media_upload" : "finish_media_edit")],
-      [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-    ])
-  );
-});
-// Finish Media Upload for Add Product
-bot.action('finish_media_upload', async (ctx) => {
-  const chatId = ctx.chat.id;
-  const state = session[chatId];
-  const lang = userLang[chatId] || "uz";
-
-  if (!state || state.step !== 'add_product_media_multiple' || !state.categoryId) {
-    return ctx.reply("Sessiya xatosi. Qayta boshlang.");
-  }
-
-  try {
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-
-    const mediaFiles = state.data.mediaFiles || [];
-    const { nameUz, nameRu, descriptionUz, descriptionRu } = state.data;
-
-    // Agar media bo'sh bo'lsa – ogohlantirish
-    if (mediaFiles.length === 0) {
-      return ctx.reply(
-        "Hech qanday media yuklanmadi. Faqat matn saqlanadi.",
-        Markup.inlineKeyboard([[Markup.button.callback("Saqlash", "confirm_save_product_no_media")]])
-      );
-    }
-
-    // Statistikani ko'rsatish
-    const photoCount = mediaFiles.filter(m => m.mediaType === 'photo').length;
-    const videoCount = mediaFiles.filter(m => m.mediaType === 'video').length;
-
-    ctx.reply(
-      `📊 Yuklangan: ${photoCount} rasm, ${videoCount} video.\nSaqlashni tasdiqlang?`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback("✅ Ha, saqlash", "confirm_save_product")],
-        [Markup.button.callback("❌ Bekor qilish", "cancel_save_product")]
-      ])
-    );
-
-  } catch (error) {
-    console.error('Media tasdiqlashda xato:', error);
-    ctx.reply("❌ Xatolik yuz berdi.");
-  }
-});
-// Confirm Save Product
-bot.action('confirm_save_product', async (ctx) => {
-  const chatId = ctx.chat.id;
-  const state = session[chatId];
-  const lang = userLang[chatId] || "uz";
-
-  try {
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
-
-    // 1. Mahsulotni saqlash (SQLite)
-    const result = await db.run(`
-      INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru)
-      VALUES (?, ?, ?, ?, ?)
-    `, [state.categoryId, state.data.nameUz, state.data.nameRu, state.data.descriptionUz, state.data.descriptionRu]);
-
-    const productId = result.lastID;
-
-    // 2. Medialarni saqlash
-    for (let i = 0; i < state.data.mediaFiles.length; i++) {
-      const m = state.data.mediaFiles[i];
-      await db.run(`
-        INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `, [productId, m.fileId, m.mediaType, m.fileSize, m.mimeType, i]);
-    }
-
-    // 3. Tozalash va xabar
-    delete session[chatId];
-    ctx.reply(getText(lang, 'product_saved'), getAdminMenu(lang));
-
-  } catch (error) {
-    console.error('Mahsulot saqlashda xato:', error);
-    ctx.reply("❌ Saqlashda xato yuz berdi.");
-  }
-});
-
-// Media bo'sh bo'lsa saqlash
-bot.action('confirm_save_product_no_media', async (ctx) => {
-  // Yuqoridagi confirm_save_product kodi, lekin media loop'siz
-  // ... (oxshash kod)
-});
-
-// Cancel Save Product
-bot.action('cancel_save_product', async (ctx) => {
-  const lang = userLang[ctx.chat.id] || "uz";
-  await ctx.answerCbQuery();
-  await ctx.deleteMessage();
-  delete session[ctx.chat.id];
-  ctx.reply(lang === 'uz' ? "❌ Bekor qilindi" : "❌ Отменено");
-});
-
-// Finish Media Edit for Product
-bot.action('finish_media_edit', async (ctx) => {
-  const chatId = ctx.chat.id;
-  const state = session[chatId];
-  const lang = userLang[chatId] || "uz";
-
-  // 1. Sessiya va bosqichni tekshirish
-  if (!state || state.step !== 'edit_product_media_multiple' || !state.productId) {
-    return;
-  }
-
-  try {
-    await ctx.answerCbQuery(); // Tugma bosilganini tasdiqlash
-    await ctx.deleteMessage(); // "Tayyor" xabarini o‘chirish
-
-    const productId = state.productId;
-    const mediaFiles = state.data?.mediaFiles || [];
-
-    // 2. Agar hech qanday media yuklanmagan bo'lsa – ogohlantirish
-    if (mediaFiles.length === 0) {
-      return ctx.reply(
-        "Hech qanday rasm yoki video yuklanmadi. Eski medialar o‘chirildi.",
-        Markup.inlineKeyboard([
-          [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-        ])
-      );
-    }
-
-    // 3. Eski medialarni o‘chirish (SQLite)
-    await db.run(`DELETE FROM product_media WHERE product_id = ?`, [productId]);
-
-    // 4. Yangi medialarni qo‘shish (SQLite)
-    const insertStmt = await db.prepare(`
-      INSERT INTO product_media 
-      (product_id, file_id, media_type, file_size, mime_type, order_index, created_at) 
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-    `);
-
-    for (let i = 0; i < mediaFiles.length; i++) {
-      const m = mediaFiles[i];
-      await insertStmt.run(
-        productId,
-        m.fileId,
-        m.mediaType,
-        m.fileSize || null,
-        m.mimeType || null,
-        i
-      );
-    }
-
-    await insertStmt.finalize(); // Prepare statementni yopish
-
-    // 5. Sessiyani tozalash
-    delete session[chatId];
-
-    // 6. Muvaffaqiyat xabari
-    ctx.reply(getText(lang, 'media_updated'), getAdminMenu(lang));
-
-  } catch (error) {
-    console.error('Media yangilashda xato (SQLite):', error);
-    ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
-  }
-});
-
-// ===================== TEXT INPUT HANDLER =====================
-bot.on("text", async (ctx) => {
-  const state = session[ctx.chat.id];
-  if (!state) return;
-
-  const lang = userLang[ctx.chat.id] || "uz";
-  const text = ctx.message.text.trim();
-
-  try {
-    // === ADD CATEGORY ===
-    if (state.step === "add_category_name_uz") {
-      state.data.nameUz = text;
-      state.step = "add_category_name_ru";
-      return ctx.reply(getText(lang, 'enter_category_name_ru'));
-    }
-    if (state.step === "add_category_name_ru") {
-      await addCategory(state.data.nameUz, text);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'category_saved'), getAdminMenu(lang));
-    }
-
-    // === ADD SUBCATEGORY ===
-    if (state.step === "add_subcategory_name_uz") {
-      state.data.nameUz = text;
-      state.step = "add_subcategory_name_ru";
-      return ctx.reply(getText(lang, 'enter_subcategory_name_ru'));
-    }
-    if (state.step === "add_subcategory_name_ru") {
-      await addCategory(state.data.nameUz, text, state.parentId);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'subcategory_saved'), getAdminMenu(lang));
-    }
-
-    // === ADD PRODUCT ===
-// ... boshqa step-lar ...
-
-// === ADD PRODUCT OQIMI ===
-if (state.step === "add_product_name_uz") {
-  state.data.nameUz = text;
-  state.step = "add_product_name_ru";
-  return ctx.reply(getText(lang, 'enter_product_name_ru'));
-}
-
-if (state.step === "add_product_name_ru") {
-  state.data.nameRu = text;
-  state.step = "add_product_description_uz";
-  return ctx.reply(getText(lang, 'enter_product_description_uz'));
-}
-
-if (state.step === "add_product_description_uz") {
-  state.data.descriptionUz = text;
-  state.step = "add_product_description_ru";
-  return ctx.reply(getText(lang, 'enter_product_description_ru'));
-}
-
-if (state.step === "add_product_description_ru") {
-  state.data.descriptionRu = text;
-  state.step = "add_product_media_multiple";
-  state.data.mediaFiles = [];  // Media uchun massiv
-  return ctx.reply(
-    getText(lang, 'send_multiple_media'),
-    Markup.inlineKeyboard([
-      [Markup.button.callback("✅ Tayyor", "finish_media_upload")],
-      [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-    ])
-  );
-}
-
-// ... boshqa step-lar ...
-
-    // === EDIT CATEGORY ===
-    if (state.step === "edit_category_name_uz") {
-      state.data.nameUz = text;
-      state.step = "edit_category_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
-    if (state.step === "edit_category_name_ru") {
-      await updateCategory(state.categoryId, state.data.nameUz, text);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'category_updated'));
-    }
-
-    // === EDIT SUBCATEGORY ===
-    if (state.step === "edit_subcategory_name_uz") {
-      state.data.nameUz = text;
-      state.step = "edit_subcategory_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
-    if (state.step === "edit_subcategory_name_ru") {
-      await updateCategory(state.categoryId, state.data.nameUz, text);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'subcategory_updated'));
-    }
-
-    // === EDIT PRODUCT NAME ===
-    if (state.step === "edit_product_name_uz") {
-      state.data.nameUz = text;
-      state.step = "edit_product_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
-    if (state.step === "edit_product_name_ru") {
-      const product = await getProductById(state.productId);
-      await updateProduct(state.productId, state.data.nameUz, text, product.description_uz, product.description_ru);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'));
-    }
-
-    // === EDIT PRODUCT DESCRIPTION ===
-    if (state.step === "edit_product_description_uz") {
-      state.data.descriptionUz = text;
-      state.step = "edit_product_description_ru";
-      return ctx.reply(getText(lang, 'enter_new_description_ru'));
-    }
-    if (state.step === "edit_product_description_ru") {
-      const product = await getProductById(state.productId);
-      await updateProduct(state.productId, product.name_uz, product.name_ru, state.data.descriptionUz, text);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'));
-    }
-
-  } catch (error) {
-    console.error("Text input error:", error);
-    ctx.reply("Xatolik yuz berdi");
-  }
-});
-
-// Botni ishga tushirish
-bot.launch().then(() => {
-  console.log('✅ Bot muvaffaqiyatli ishga tushdi');
-}).catch((err) => {
-  console.error('❌ Bot ishga tushirishda xato:', err);
-});
+// ===================== LAUNCH =====================
+bot.launch().then(() => console.log('Bot ishga tushdi'));
