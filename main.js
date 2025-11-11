@@ -477,14 +477,15 @@ bot.hears([/Kategoriya tahrirlash/i, /Редактировать категор�
     const lang = userLang[ctx.chat.id] || "uz";
     if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
-    const buttons = categories.map(c => {
-      const name = lang === 'uz' ? c.name_uz : c.name_ru;
-      return [Markup.button.callback(name, `edit_cat_${c.id}`)];
-    });
+    const buttons = categories.map(c => [Markup.button.callback(
+      lang === 'uz' ? c.name_uz : c.name_ru,
+      `edit_cat_${c.id}`
+    )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
+    console.error('Edit cat error:', error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
@@ -497,14 +498,15 @@ bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатего�
     const lang = userLang[ctx.chat.id] || "uz";
     if (subCategories.length === 0) return ctx.reply(getText(lang, 'no_subcategories'));
 
-    const buttons = subCategories.map(c => {
-      const name = lang === 'uz' ? c.name_uz : c.name_ru;
-      return [Markup.button.callback(name, `edit_subcat_${c.id}`)];
-    });
+    const buttons = subCategories.map(c => [Markup.button.callback(
+      lang === 'uz' ? c.name_uz : c.name_ru,
+      `edit_subcat_${c.id}`
+    )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
+    console.error('Edit subcat error:', error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
@@ -553,19 +555,18 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i], async
     const lang = userLang[ctx.chat.id] || "uz";
     if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
-    const buttons = categories.map(c => {
-      const name = lang === 'uz' ? c.name_uz : c.name_ru;
-      return [Markup.button.callback(`${name}`, `delete_cat_${c.id}`)];
-    });
+    const buttons = categories.map(c => [Markup.button.callback(
+      `${lang === 'uz' ? c.name_uz : c.name_ru}`,
+      `delete_cat_${c.id}`
+    )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error('Delete category xatosi:', error);
+    console.error('Delete cat error:', error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
-
 // Delete Subcategory
 bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
@@ -574,19 +575,18 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i], asy
     const lang = userLang[ctx.chat.id] || "uz";
     if (subCategories.length === 0) return ctx.reply(getText(lang, 'no_subcategories'));
 
-    const buttons = subCategories.map(c => {
-      const name = lang === 'uz' ? c.name_uz : c.name_ru;
-      return [Markup.button.callback(`${name}`, `delete_subcat_${c.id}`)];
-    });
+    const buttons = subCategories.map(c => [Markup.button.callback(
+      `${lang === 'uz' ? c.name_uz : c.name_ru}`,
+      `delete_subcat_${c.id}`
+    )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    console.error('Delete subcategory xatosi:', error);
-    ctx.reply("❌Xatolik yuz berdi");
+    console.error('Delete subcat error:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
-
 // Delete Product
 bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
