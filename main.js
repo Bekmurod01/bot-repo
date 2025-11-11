@@ -638,77 +638,77 @@ bot.hears([/^O'chirish$/i, /^Удалить$/i, /O'chirish/i, /Удалить/i]
   await ctx.reply(getText(lang, 'select_edit_option'), getDeleteMenu(lang));
 });
 
-    // Edit Category Flow
-    if (state.step === "edit_category_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "edit_category_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
+//     // Edit Category Flow
+//     if (state.step === "edit_category_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "edit_category_name_ru";
+//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
+//     }
 
-    if (state.step === "edit_category_name_ru") {
-      await updateCategory(state.categoryId, state.data.nameUz, inputText);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'category_updated'));
-    }
+//     if (state.step === "edit_category_name_ru") {
+//       await updateCategory(state.categoryId, state.data.nameUz, inputText);
+//       delete session[ctx.chat.id];
+//       return ctx.reply(getText(lang, 'category_updated'));
+//     }
 
-    // Edit Subcategory Flow
-    if (state.step === "edit_subcategory_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "edit_subcategory_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
+//     // Edit Subcategory Flow
+//     if (state.step === "edit_subcategory_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "edit_subcategory_name_ru";
+//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
+//     }
 
-    if (state.step === "edit_subcategory_name_ru") {
-      await updateCategory(state.categoryId, state.data.nameUz, inputText);
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'subcategory_updated'));
-    }
+//     if (state.step === "edit_subcategory_name_ru") {
+//       await updateCategory(state.categoryId, state.data.nameUz, inputText);
+//       delete session[ctx.chat.id];
+//       return ctx.reply(getText(lang, 'subcategory_updated'));
+//     }
 
-    // Edit Product Name Flow
-    if (state.step === "edit_product_name_uz") {
-      state.data.nameUz = inputText;
-      state.step = "edit_product_name_ru";
-      return ctx.reply(getText(lang, 'enter_new_name_ru'));
-    }
+//     // Edit Product Name Flow
+//     if (state.step === "edit_product_name_uz") {
+//       state.data.nameUz = inputText;
+//       state.step = "edit_product_name_ru";
+//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
+//     }
 
-    if (state.step === "edit_product_name_ru") {
-      const product = await getProductById(state.productId);
-      await updateProduct(
-        state.productId,
-        state.data.nameUz,
-        inputText,
-        product.description_uz,
-        product.description_ru
-      );
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'));
-    }
+//     if (state.step === "edit_product_name_ru") {
+//       const product = await getProductById(state.productId);
+//       await updateProduct(
+//         state.productId,
+//         state.data.nameUz,
+//         inputText,
+//         product.description_uz,
+//         product.description_ru
+//       );
+//       delete session[ctx.chat.id];
+//       return ctx.reply(getText(lang, 'product_updated'));
+//     }
 
-    // Edit Product Description Flow
-    if (state.step === "edit_product_description_uz") {
-      state.data.descriptionUz = inputText;
-      state.step = "edit_product_description_ru";
-      return ctx.reply(getText(lang, 'enter_new_description_ru'));
-    }
+//     // Edit Product Description Flow
+//     if (state.step === "edit_product_description_uz") {
+//       state.data.descriptionUz = inputText;
+//       state.step = "edit_product_description_ru";
+//       return ctx.reply(getText(lang, 'enter_new_description_ru'));
+//     }
 
-    if (state.step === "edit_product_description_ru") {
-      const product = await getProductById(state.productId);
-      await updateProduct(
-        state.productId,
-        product.name_uz,
-        product.name_ru,
-        state.data.descriptionUz,
-        inputText
-      );
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'));
-    }
+//     if (state.step === "edit_product_description_ru") {
+//       const product = await getProductById(state.productId);
+//       await updateProduct(
+//         state.productId,
+//         product.name_uz,
+//         product.name_ru,
+//         state.data.descriptionUz,
+//         inputText
+//       );
+//       delete session[ctx.chat.id];
+//       return ctx.reply(getText(lang, 'product_updated'));
+//     }
 
-  } catch (error) {
-    console.error('Matn kiritishda xato:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
-  }
-});
+//   } catch (error) {
+//     console.error('Matn kiritishda xato:', error);
+//     ctx.reply("❌ Xatolik yuz berdi");
+//   }
+// });
 
 // Botni ishga tushirish
 bot.launch()
