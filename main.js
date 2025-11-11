@@ -503,7 +503,6 @@ bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатего�
       `edit_subcat_${c.id}`
     )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Edit subcat error:', error);
@@ -551,7 +550,7 @@ bot.hears([/^O'chirish$/i, /^Удалить$/i, /O'chirish/i, /Удалить/i]
 bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
   try {
-    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
+    const categories = await getRootCategories();
     const lang = userLang[ctx.chat.id] || "uz";
     if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
@@ -560,7 +559,6 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i], async
       `delete_cat_${c.id}`
     )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
     ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Delete cat error:', error);
@@ -580,7 +578,6 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i], asy
       `delete_subcat_${c.id}`
     )]);
     buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
     ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Delete subcat error:', error);
@@ -1288,12 +1285,11 @@ bot.on("text", async (ctx) => {
 
     if (state.step === "add_category_name_ru") {
       const result = await db.run(
-        `INSERT INTO categories (name_uz, name_ru) VALUES (?, ?)`,
+        `INSERT INTO categories (name_uz, name_ru, parent_id) VALUES (?, ?, NULL)`,
         [state.data.nameUz, inputText]
       );
-      const categoryId = result.lastID;
       state.step = "add_subcategory_name_uz";
-      state.parentId = categoryId;
+      state.parentId = result.lastID;
       return ctx.reply(getText(lang, 'enter_subcategory_name_uz'));
     }
 
@@ -1309,10 +1305,9 @@ bot.on("text", async (ctx) => {
         `INSERT INTO categories (name_uz, name_ru, parent_id) VALUES (?, ?, ?)`,
         [state.data.nameUz, inputText, state.parentId]
       );
-      const subcategoryId = result.lastID;
       state.step = "add_product_name_uz";
-      state.categoryId = subcategoryId;
-      state.data = {};
+      state.categoryId = result.lastID;
+      state.data = {}; // Reset for product
       return ctx.reply(getText(lang, 'enter_product_name_uz'));
     }
 
@@ -1360,8 +1355,8 @@ bot.on("text", async (ctx) => {
         `UPDATE categories SET name_uz = ?, name_ru = ? WHERE id = ?`,
         [state.data.nameUz, inputText, state.categoryId]
       );
-      delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'category_updated'), getAdminMenu(lang));
+      delete session[ctx.chat.id]; // To'g'ri
+      return ctx.reply(getText(lang, 'category_updated'));
     }
 
     // === EDIT SUBCATEGORY FLOW ===
@@ -1377,7 +1372,7 @@ bot.on("text", async (ctx) => {
         [state.data.nameUz, inputText, state.categoryId]
       );
       delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'subcategory_updated'), getAdminMenu(lang));
+      return ctx.reply(getText(lang, 'subcategory_updated'));
     }
 
     // === EDIT PRODUCT NAME FLOW ===
@@ -1388,12 +1383,15 @@ bot.on("text", async (ctx) => {
     }
 
     if (state.step === "edit_product_name_ru") {
+      const product = await db.get(`SELECT * FROM products WHERE id = ?`, [state.productId]);
+      if (!product) throw new Error("Mahsulot topilmadi");
+
       await db.run(
         `UPDATE products SET name_uz = ?, name_ru = ? WHERE id = ?`,
         [state.data.nameUz, inputText, state.productId]
       );
       delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'), getAdminMenu(lang));
+      return ctx.reply(getText(lang, 'product_updated'));
     }
 
     // === EDIT PRODUCT DESCRIPTION FLOW ===
@@ -1404,17 +1402,21 @@ bot.on("text", async (ctx) => {
     }
 
     if (state.step === "edit_product_description_ru") {
+      const product = await db.get(`SELECT * FROM products WHERE id = ?`, [state.productId]);
+      if (!product) throw new Error("Mahsulot topilmadi");
+
       await db.run(
         `UPDATE products SET description_uz = ?, description_ru = ? WHERE id = ?`,
         [state.data.descriptionUz, inputText, state.productId]
       );
       delete session[ctx.chat.id];
-      return ctx.reply(getText(lang, 'product_updated'), getAdminMenu(lang));
+      return ctx.reply(getText(lang, 'product_updated'));
     }
 
   } catch (error) {
-    console.error('Text handler xatosi:', error);
-    ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
+    console.error('Matn kiritishda xato:', error);
+    ctx.reply("Xatolik yuz berdi. Iltimos, qayta urinib ko‘ring.");
+    delete session[ctx.chat.id]; // Xatolikda ham sessiyani tozalash
   }
 });
 
