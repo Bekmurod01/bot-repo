@@ -687,10 +687,12 @@ bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], as
 });
 
 // ===================== CATALOG HANDLER =====================
-bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/i], async (ctx) => {
+// ===================== KATALOG HANDLER (SQLITE UCHUN) =====================
+bot.hears([/Katalog/i, /Каталог/i, /Katalog/i, /Каталог/i], async (ctx) => {
   setCurrentMenu(ctx.chat.id, 'catalog');
   try {
-    const categories = await getRootCategories();
+    // getRootCategories() o'rniga to'g'ridan-to'g'ri db.all()
+    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
     if (categories.length === 0) {
@@ -704,6 +706,7 @@ bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/
 
     categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
 
+    // session ni tozalash
     session[ctx.chat.id] = { categoryPath: [] };
 
     ctx.reply(
@@ -712,7 +715,7 @@ bot.hears([/Katalog/i, /Каталог/i, /🛒 Katalog/i, /🛒 Каталог/
     );
   } catch (error) {
     console.error('Katalog xatosi:', error);
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
