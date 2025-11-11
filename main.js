@@ -562,168 +562,19 @@ bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /�
 });
 
 // ===================== DELETE HANDLERS =====================
-// bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Удалить/i], async (ctx) => {
-//   if (!isAdmin(ctx.from.id)) return;
-//   setCurrentMenu(ctx.chat.id, 'delete');
-//   const lang = userLang[ctx.chat.id] || "uz";
-//   let inputText = ctx.message.text;
-
-//   try {
-//     // Add Category Flow
-//     if (state.step === "add_category_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "add_category_name_ru";
-//       return ctx.reply(getText(lang, 'enter_category_name_ru'));
-//     }
-
-//     if (state.step === "add_category_name_ru") {
-//       const category = await addCategory(state.data.nameUz, inputText);
-//       state.step = "add_subcategory_name_uz";
-//       state.parentId = category.id;
-//       return ctx.reply(getText(lang, 'enter_subcategory_name_uz'));
-//     }
-
-//     // Add Subcategory Flow
-//     if (state.step === "add_subcategory_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "add_subcategory_name_ru";
-//       return ctx.reply(getText(lang, 'enter_subcategory_name_ru'));
-//     }
-
-//     if (state.step === "add_subcategory_name_ru") {
-//       const subcategory = await addCategory(state.data.nameUz, inputText, state.parentId);
-//       state.step = "add_product_name_uz";
-//       state.categoryId = subcategory.id;
-//       state.data = {}; // Reset data for product
-//       return ctx.reply(getText(lang, 'enter_product_name_uz'));
-//     }
-
-//     // Add Product Flow
-//     if (state.step === "add_product_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "add_product_name_ru";
-//       return ctx.reply(getText(lang, 'enter_product_name_ru'));
-//     }
-
-//     if (state.step === "add_product_name_ru") {
-//       state.data.nameRu = inputText;
-//       state.step = "add_product_description_uz";
-//       return ctx.reply(getText(lang, 'enter_product_description_uz'));
-//     }
-
-//     if (state.step === "add_product_description_uz") {
-//       state.data.descriptionUz = inputText;
-//       state.step = "add_product_description_ru";
-//       return ctx.reply(getText(lang, 'enter_product_description_ru'));
-//     }
-
-//     if (state.step === "add_product_description_ru") {
-//       state.data.descriptionRu = inputText;
-//       state.step = "add_product_media_multiple";
-//       state.data.mediaFiles = [];
-//       return ctx.reply(
-//         getText(lang, 'send_multiple_media'),
-//         Markup.inlineKeyboard([
-//           [Markup.button.callback("✅ Tayyor", "finish_media_upload")],
-//           [Markup.button.callback(getText(lang, 'back'), "admin_back")]
-//         ])
-//       );
-//     }
 bot.hears([/^O'chirish$/i, /^Удалить$/i, /O'chirish/i, /Удалить/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   setCurrentMenu(ctx.chat.id, 'delete');
   const lang = userLang[ctx.chat.id] || "uz";
-
   await ctx.reply(getText(lang, 'select_edit_option'), getDeleteMenu(lang));
 });
 
-//     // Edit Category Flow
-//     if (state.step === "edit_category_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "edit_category_name_ru";
-//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
-//     }
-
-//     if (state.step === "edit_category_name_ru") {
-//       await updateCategory(state.categoryId, state.data.nameUz, inputText);
-//       delete session[ctx.chat.id];
-//       return ctx.reply(getText(lang, 'category_updated'));
-//     }
-
-//     // Edit Subcategory Flow
-//     if (state.step === "edit_subcategory_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "edit_subcategory_name_ru";
-//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
-//     }
-
-//     if (state.step === "edit_subcategory_name_ru") {
-//       await updateCategory(state.categoryId, state.data.nameUz, inputText);
-//       delete session[ctx.chat.id];
-//       return ctx.reply(getText(lang, 'subcategory_updated'));
-//     }
-
-//     // Edit Product Name Flow
-//     if (state.step === "edit_product_name_uz") {
-//       state.data.nameUz = inputText;
-//       state.step = "edit_product_name_ru";
-//       return ctx.reply(getText(lang, 'enter_new_name_ru'));
-//     }
-
-//     if (state.step === "edit_product_name_ru") {
-//       const product = await getProductById(state.productId);
-//       await updateProduct(
-//         state.productId,
-//         state.data.nameUz,
-//         inputText,
-//         product.description_uz,
-//         product.description_ru
-//       );
-//       delete session[ctx.chat.id];
-//       return ctx.reply(getText(lang, 'product_updated'));
-//     }
-
-//     // Edit Product Description Flow
-//     if (state.step === "edit_product_description_uz") {
-//       state.data.descriptionUz = inputText;
-//       state.step = "edit_product_description_ru";
-//       return ctx.reply(getText(lang, 'enter_new_description_ru'));
-//     }
-
-//     if (state.step === "edit_product_description_ru") {
-//       const product = await getProductById(state.productId);
-//       await updateProduct(
-//         state.productId,
-//         product.name_uz,
-//         product.name_ru,
-//         state.data.descriptionUz,
-//         inputText
-//       );
-//       delete session[ctx.chat.id];
-//       return ctx.reply(getText(lang, 'product_updated'));
-//     }
-
-//   } catch (error) {
-//     console.error('Matn kiritishda xato:', error);
-//     ctx.reply("❌ Xatolik yuz berdi");
-//   }
-// });
-
-// Botni ishga tushirish
-bot.launch()
-  .then(() => {
-    console.log('✅ Bot muvaffaqiyatli ishga tushdi');
-  })
-  .catch((err) => {
-    console.error('❌ Bot ishga tushirishda xato:', err);
-  });
 // Delete Category
-bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 Kategoriya o'chirish/i, /🗑 Удалить категорию/i], async (ctx) => {
+bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /Kategoriya o'chirish/i, /Удалить категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    const categories = await getRootCategories();
+    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
     if (categories.length === 0) {
@@ -732,7 +583,7 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 
 
     const categoryButtons = categories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`🗑 ${categoryName}`, `delete_cat_${c.id}`)];
+      return [Markup.button.callback(`${categoryName}`, `delete_cat_${c.id}`)];
     });
 
     categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
@@ -742,16 +593,16 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Delete category xatosi:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // Delete Subcategory
-bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /🗑 Bo'lim o'chirish/i, /🗑 Удалить подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    // SQLite: Changed query to use SELECT with WHERE clause
     const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
@@ -761,7 +612,7 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /�
 
     const categoryButtons = subCategories.map((c) => {
       const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`🗑 ${categoryName}`, `delete_subcat_${c.id}`)];
+      return [Markup.button.callback(`${categoryName}`, `delete_subcat_${c.id}`)];
     });
 
     categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
@@ -771,16 +622,16 @@ bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /�
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Delete subcategory xatosi:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // Delete Product
-bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /🗑 Mahsulot o'chirish/i, /🗑 Удалить товар/i], async (ctx) => {
+bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /Mahsulot o'chirish/i, /Удалить товар/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
 
   try {
-    // SQLite: Changed query
     const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
@@ -800,7 +651,8 @@ bot.hears([/Mahsulot o'chirish/i, /Удалить товар/i, /🗑 Mahsulot o
       Markup.inlineKeyboard(categoryButtons)
     );
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Delete product xatosi:', error);
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
