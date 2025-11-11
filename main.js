@@ -384,30 +384,22 @@ bot.hears([/Kategoriya qo'shish/i, /Добавить категорию/i, /➕ 
 });
 
 // ===================== ADD SUBCATEGORY =====================
-bot.hears([/Bo'lim qo'shish/i, /Добавить подкатегорию/i, /📂 Bo'lim qo'shish/i, /📂 Добавить подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim qo'shish/i, /Добавить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   try {
-    const categories = await getRootCategories();
+    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
+    if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
-    if (categories.length === 0) {
-      return ctx.reply(getText(lang, 'no_categories'));
-    }
-
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `add_subcat_to_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `add_subcat_to_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
@@ -478,58 +470,42 @@ bot.hears([/^Tahrirlash$/i, /^Редактировать$/i, /✏️ Tahrirlash/
 });
 
 // Edit Category
-bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i, /📁 Kategoriya tahrirlash/i, /📁 Редактировать категорию/i], async (ctx) => {
+bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   try {
-    const categories = await getRootCategories();
+    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
+    if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
-    if (categories.length === 0) {
-      return ctx.reply(getText(lang, 'no_categories'));
-    }
-
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `edit_cat_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `edit_cat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
 // Edit Subcategory
-bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i, /📂 Bo'lim tahrirlash/i, /📂 Редактировать подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   try {
-    const subCategories = await getAllSubCategories();
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
+    if (subCategories.length === 0) return ctx.reply(getText(lang, 'no_subcategories'));
 
-    if (subCategories.length === 0) {
-      return ctx.reply(getText(lang, 'no_subcategories'));
-    }
-
-    const categoryButtons = subCategories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(categoryName, `edit_subcat_${c.id}`)];
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `edit_subcat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    ctx.reply("Xatolik yuz berdi");
   }
 });
 
@@ -570,28 +546,20 @@ bot.hears([/^O'chirish$/i, /^Удалить$/i, /O'chirish/i, /Удалить/i]
 });
 
 // Delete Category
-bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /Kategoriya o'chirish/i, /Удалить категорию/i], async (ctx) => {
+bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   try {
     const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
+    if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
 
-    if (categories.length === 0) {
-      return ctx.reply(getText(lang, 'no_categories'));
-    }
-
-    const categoryButtons = categories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`${categoryName}`, `delete_cat_${c.id}`)];
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(`${name}`, `delete_cat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Delete category xatosi:', error);
     ctx.reply("Xatolik yuz berdi");
@@ -599,31 +567,23 @@ bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /Kateg
 });
 
 // Delete Subcategory
-bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i, /Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
+bot.hears([/Bo'lim o'chirish/i, /Удалить подкатегорию/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
-
   try {
     const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
+    if (subCategories.length === 0) return ctx.reply(getText(lang, 'no_subcategories'));
 
-    if (subCategories.length === 0) {
-      return ctx.reply(getText(lang, 'no_subcategories'));
-    }
-
-    const categoryButtons = subCategories.map((c) => {
-      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
-      return [Markup.button.callback(`${categoryName}`, `delete_subcat_${c.id}`)];
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(`${name}`, `delete_subcat_${c.id}`)];
     });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
-
-    ctx.reply(
-      getText(lang, 'select_subcategory'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
   } catch (error) {
     console.error('Delete subcategory xatosi:', error);
-    ctx.reply("Xatolik yuz berdi");
+    ctx.reply("❌Xatolik yuz berdi");
   }
 });
 
@@ -691,7 +651,6 @@ bot.hears([/^Orqaga$/i, /^Назад$/i, /🔙 Orqaga/i, /🔙 Назад/i], as
 bot.hears([/Katalog/i, /Каталог/i, /Katalog/i, /Каталог/i], async (ctx) => {
   setCurrentMenu(ctx.chat.id, 'catalog');
   try {
-    // getRootCategories() o'rniga to'g'ridan-to'g'ri db.all()
     const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
     const lang = userLang[ctx.chat.id] || "uz";
 
@@ -705,19 +664,82 @@ bot.hears([/Katalog/i, /Каталог/i, /Katalog/i, /Каталог/i], async 
     });
 
     categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "back_to_menu")]);
-
-    // session ni tozalash
     session[ctx.chat.id] = { categoryPath: [] };
 
-    ctx.reply(
-      getText(lang, 'select_category'),
-      Markup.inlineKeyboard(categoryButtons)
-    );
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(categoryButtons));
   } catch (error) {
     console.error('Katalog xatosi:', error);
     ctx.reply("Xatolik yuz berdi");
   }
 });
+
+// ===================== EDIT: KATEGORIYA TAHRIRLASH =====================
+bot.hears([/Kategoriya tahrirlash/i, /Редактировать категорию/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  try {
+    const categories = await db.all("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
+    const lang = userLang[ctx.chat.id] || "uz";
+    if (categories.length === 0) return ctx.reply(getText(lang, 'no_categories'));
+
+    const buttons = categories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `edit_cat_${c.id}`)];
+    });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
+
+    ctx.reply(getText(lang, 'select_category'), Markup.inlineKeyboard(buttons));
+  } catch (error) {
+    ctx.reply("Xatolik yuz berdi");
+  }
+});
+
+// ===================== EDIT: BO'LIM TAHRIRLASH =====================
+bot.hears([/Bo'lim tahrirlash/i, /Редактировать подкатегорию/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+  try {
+    const subCategories = await db.all("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const lang = userLang[ctx.chat.id] || "uz";
+    if (subCategories.length === 0) return ctx.reply(getText(lang, 'no_subcategories'));
+
+    const buttons = subCategories.map(c => {
+      const name = lang === 'uz' ? c.name_uz : c.name_ru;
+      return [Markup.button.callback(name, `edit_subcat_${c.id}`)];
+    });
+    buttons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
+
+    ctx.reply(getText(lang, 'select_subcategory'), Markup.inlineKeyboard(buttons));
+  } catch (error) {
+    ctx.reply("Xatolik yuz berdi");
+  }
+});
+
+bot.hears([/Mahsulot tahrirlash/i, /Редактировать товар/i, /📝 Mahsulot tahrirlash/i, /📝 Редактировать товар/i], async (ctx) => {
+  if (!isAdmin(ctx.from.id)) return;
+
+  try {
+    const subCategories = await pool.query("SELECT * FROM categories WHERE parent_id IS NOT NULL ORDER BY id DESC");
+    const lang = userLang[ctx.chat.id] || "uz";
+
+    if (subCategories.rows.length === 0) {
+      return ctx.reply(getText(lang, 'no_subcategories'));
+    }
+
+    const categoryButtons = subCategories.rows.map((c) => {
+      const categoryName = lang === 'uz' ? (c.name_uz || c.name_ru) : (c.name_ru || c.name_uz);
+      return [Markup.button.callback(categoryName, `edit_prod_cat_${c.id}`)];
+    });
+
+    categoryButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
+
+    ctx.reply(
+      getText(lang, 'select_subcategory'),
+      Markup.inlineKeyboard(categoryButtons)
+    );
+  } catch (error) {
+    ctx.reply("❌ Xatolik yuz berdi");
+  }
+});
+
 
 // ===================== CALLBACK ACTION HANDLERS =====================
 
