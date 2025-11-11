@@ -809,31 +809,58 @@ bot.action(/edit_subcat_(\d+)/, async (ctx) => {
 
 // Edit Product Category Selection
 bot.action(/edit_prod_cat_(\d+)/, async (ctx) => {
-  const categoryId = ctx.match[1];
+  const chatId = ctx.chat.id;
+  const categoryId = parseInt(ctx.match[1], 10);
+  const lang = userLang[chatId] || "uz";
+
+  // 1. categoryId to'g'ri raqam ekanligini tekshirish
+  if (isNaN(categoryId)) {
+    await ctx.answerCbQuery("Noto‘g‘ri ID");
+    return;
+  }
+
   try {
-    const products = await getProductsByCategory(categoryId);
-    const lang = userLang[ctx.chat.id] || "uz";
+    // 2. Mahsulotlarni olish – SQLite so'rovi
+    const products = await db.all(`
+      SELECT id, name_uz, name_ru, description_uz, description_ru 
+      FROM products 
+      WHERE category_id = ? 
+      ORDER BY id DESC
+    `, [categoryId]);
 
-    await ctx.answerCbQuery();
-    await ctx.deleteMessage();
+    await ctx.answerCbQuery(); // Tugma bosilganini tasdiqlash
+    await ctx.deleteMessage();  // Oldingi xabarni o‘chirish
 
+    // 3. Agar mahsulot yo‘q bo‘lsa
     if (products.length === 0) {
-      return ctx.reply(getText(lang, 'no_products'));
+      return ctx.reply(
+        getText(lang, 'no_products'),
+        Markup.inlineKeyboard([
+          [Markup.button.callback(getText(lang, 'back'), "admin_back")]
+        ])
+      );
     }
 
+    // 4. Tugmalarni yaratish
     const productButtons = products.map((p, index) => {
-      const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
-      return [Markup.button.callback(`${index + 1}. ${productName || 'Nomsiz'}`, `edit_prod_${p.id}`)];
+      const productName = lang === 'uz' 
+        ? (p.name_uz || p.name_ru || 'Nomsiz') 
+        : (p.name_ru || p.name_uz || 'Без названия');
+      return [Markup.button.callback(`${index + 1}. ${productName}`, `edit_prod_${p.id}`)];
     });
 
+    // Orqaga tugmasi
     productButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    ctx.reply(
+    // 5. Foydalanuvchiga xabar
+    await ctx.reply(
       getText(lang, 'select_product'),
       Markup.inlineKeyboard(productButtons)
     );
+
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Mahsulot ro\'yxatini olishda xato (SQLite):', error);
+    await ctx.reply("Xatolik yuz berdi. Qayta urinib ko‘ring.");
   }
 });
 
