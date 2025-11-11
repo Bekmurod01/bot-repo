@@ -702,13 +702,13 @@ bot.hears([/^O'chirish$/i, /^Удалить$/i, /🗑 O'chirish/i, /🗑 Уда�
 });
 
 // Botni ishga tushirish
-bot.launch().then(() => {
-  console.log('✅ Bot muvaffaqiyatli ishga tushdi');
-}).catch((err) => {
-  console.error('❌ Bot ishga tushirishda xato:', err);
-});
-  await ctx.reply(getText(lang, 'select_edit_option'), getDeleteMenu(lang));
-});
+bot.launch()
+  .then(() => {
+    console.log('✅ Bot muvaffaqiyatli ishga tushdi');
+  })
+  .catch((err) => {
+    console.error('❌ Bot ishga tushirishda xato:', err);
+  });
 
 // Delete Category
 bot.hears([/Kategoriya o'chirish/i, /Удалить категорию/i, /🗑 Kategoriya o'chirish/i, /🗑 Удалить категорию/i], async (ctx) => {
