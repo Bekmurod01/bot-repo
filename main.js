@@ -754,7 +754,6 @@ bot.action(/edit_cat_(\d+)/, async (ctx) => {
     [Markup.button.callback(getText(lang, 'back'), "admin_back")]
   ]));
 });
-
 // Edit Subcategory Action
 bot.action(/edit_subcat_(\d+)/, async (ctx) => {
   const categoryId = ctx.match[1];
@@ -771,7 +770,7 @@ bot.action(/edit_subcat_(\d+)/, async (ctx) => {
 bot.action(/edit_prod_cat_(\d+)/, async (ctx) => {
   const categoryId = ctx.match[1];
   try {
-    const products = await getProductsByCategory(categoryId);
+    const products = await db.all("SELECT * FROM products WHERE category_id = ? ORDER BY id DESC", [categoryId]);
     const lang = userLang[ctx.chat.id] || "uz";
 
     await ctx.answerCbQuery();
@@ -785,15 +784,12 @@ bot.action(/edit_prod_cat_(\d+)/, async (ctx) => {
       const productName = lang === 'uz' ? (p.name_uz || p.name_ru) : (p.name_ru || p.name_uz);
       return [Markup.button.callback(`${index + 1}. ${productName || 'Nomsiz'}`, `edit_prod_${p.id}`)];
     });
-
     productButtons.push([Markup.button.callback(getText(lang, 'back'), "admin_back")]);
 
-    ctx.reply(
-      getText(lang, 'select_product'),
-      Markup.inlineKeyboard(productButtons)
-    );
+    ctx.reply(getText(lang, 'select_product'), Markup.inlineKeyboard(productButtons));
   } catch (error) {
-    ctx.reply("❌ Xatolik yuz berdi");
+    console.error('Edit prod cat error:', error);
+    ctx.reply("❌Xatolik yuz berdi");
   }
 });
 
@@ -802,14 +798,14 @@ bot.action(/edit_prod_(\d+)/, async (ctx) => {
   const productId = ctx.match[1];
   session[ctx.chat.id] = { productId, step: "select_product_edit_option" };
   const lang = userLang[ctx.chat.id] || "uz";
-  setCurrentMenu(ctx.chat.id, 'product_edit');
   
+  setCurrentMenu(ctx.chat.id, 'product_edit'); // OK
+
   await ctx.answerCbQuery();
   await ctx.deleteMessage();
-  
-  ctx.reply(getText(lang, 'select_edit_option'), getProductEditMenu(lang));
-});
 
+  ctx.reply("Mahsulotni tahrirlash:", getProductEditMenu(lang));
+});
 // Product Edit Options
 bot.hears([/Nom tahrirlash/i, /Редактировать название/i, /📝 Nom tahrirlash/i, /📝 Редактировать название/i], async (ctx) => {
   if (!isAdmin(ctx.from.id)) return;
