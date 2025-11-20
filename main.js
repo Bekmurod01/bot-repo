@@ -1,10 +1,10 @@
 import { Telegraf, Markup } from "telegraf";
-import { config } from "dotenv";
+// import { config } from "dotenv";
 import pkg from "pg";
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 
 // Environment variables ni yuklash
-config();
+// config();
 
 const { Pool } = pkg;
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -12,11 +12,11 @@ const adminId = parseInt(process.env.ADMIN_ID);
 
 // PostgreSQL ulanish
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASS,
-  port: parseInt(process.env.DB_PORT) || 5432,
+  user: process.env.PGUSER,
+  host: process.env.PGHOST,
+  database: process.env.PGDATABASE,
+  password: process.env.PGPASSWORD,
+  port: parseInt(process.env.PGPORT) || 5432,
 });
 
 // Database ulanishini tekshirish
