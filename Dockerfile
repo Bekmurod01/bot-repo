@@ -1,23 +1,27 @@
-# Node.js 20 Alpine (eng yengil va ishonchli)
-FROM node:20-alpine
+# Debian slim — libatomic1 bor, pg muammosiz ishlaydi
+FROM node:20-slim
+
+# Kerakli system paketlari (libatomic1 + pg uchun)
+RUN apt-get update && apt-get install -y \
+    libatomic1 \
+    libpq-dev \
+    gcc \
+    g++ \
+    make \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Ish papkasi
 WORKDIR /app
 
-# libatomic1 va pg uchun kerakli paketlar
-RUN apk add --no-cache libatomic1 postgresql-dev gcc g++ make
-
-# package.json va package-lock.json nusxalash
+# package.json va lock faylni nusxalash
 COPY package*.json ./
 
-# Dependencies install (production only)
+# Dependencies (faqat production)
 RUN npm ci --omit=dev
 
 # Barcha kodlarni nusxalash
 COPY . .
 
-# Port (Railway avto tanlaydi)
-EXPOSE 3000
-
-# Start command
+# Start
 CMD ["node", "main.js"]
