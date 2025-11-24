@@ -21,7 +21,12 @@ const adminId = Number(process.env.ADMIN_ID) || 0;
 // ===================== DATABASE CONNECTION (RAILWAY 2025) =====================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Railway uchun majburiy
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on("connect", () => console.log("PostgreSQL ga ulanildi"));
