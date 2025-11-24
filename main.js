@@ -6,17 +6,18 @@ import pkg from "pg";
 // Environment variables ni yuklash
 // config();
 
-const { Pool } = pkg;
+const { Telegraf } = require('telegraf');
+const { Pool } = require('pg');
+
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = parseInt(process.env.ADMIN_ID);
 
-// PostgreSQL ulanish
+// PostgreSQL connection for Railway (just replace the old block with this)
 const pool = new Pool({
-  user: process.env.PGUSER,
-  host: process.env.PGHOST,
-  database: process.env.PGDATABASE,
-  password: process.env.PGPASSWORD,
-  port: parseInt(process.env.PGPORT) || 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false   // Required on Railway
+  }
 });
 
 // Database ulanishini tekshirish
