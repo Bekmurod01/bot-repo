@@ -17,6 +17,43 @@ const pool = new Pool({
   }
 });
 
+// ===================== JADVAL YARATISH =====================
+async function createTables() {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL
+    );
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      description_uz TEXT,
+      description_ru TEXT
+    );
+    CREATE TABLE IF NOT EXISTS product_media (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      file_size INTEGER,
+      mime_type TEXT,
+      order_index INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  try {
+    await pool.query(sql);
+    console.log("Jadvallar yaratildi yoki allaqachon bor");
+  } catch (err) {
+    console.error("Jadval yaratishda xato:", err.message);
+  }
+}
+
 // Test ulanish
 pool.connect()
   .then(() => console.log("Database ga ulanildi (Railway)"))
@@ -26,6 +63,8 @@ pool.connect()
 pool.connect()
   .then(() => console.log('✅ Database ga muvaffaqiyatli ulanildi'))
   .catch(err => console.error('❌ Database ulanish xatosi:', err));
+
+
 
 // ===================== DATABASE FUNCTIONS =====================
 async function addCategory(name_uz, name_ru, parent_id = null) {
@@ -1439,8 +1478,26 @@ bot.on("text", async (ctx) => {
 });
 
 // Botni ishga tushirish
-bot.launch().then(() => {
-  console.log('✅ Bot muvaffaqiyatli ishga tushdi');
-}).catch((err) => {
-  console.error('❌ Bot ishga tushirishda xato:', err);
-});
+(async () => {
+  console.log("Bot ishga tushmoqda...");
+
+  // 1. DB ga ulanishni kutamiz
+  try {
+    await pool.connect();
+    console.log("RAILWAY POSTGRESGA ULANILDI");
+  } catch (err) {
+    console.error("DB ga ulanishda xato:", err.message);
+    process.exit(1); // Agar DB ulanmasa – botni to'xtatamiz
+  }
+
+  // 2. Jadval yaratamiz
+  await createTables();
+
+  // 3. Endi botni ishga tushiramiz
+  bot.launch();
+  console.log("IZOLUX BOT 100% ISHLADI!");
+
+  // Graceful shutdown
+  process.once("SIGINT", () => bot.stop("SIGINT"));
+  process.once("SIGTERM", () => bot.stop("SIGTERM"));
+})();
