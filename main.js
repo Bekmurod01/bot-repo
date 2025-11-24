@@ -10,34 +10,40 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = Number(process.env.ADMIN_ID);
 
 // Railway har xil nom bilan berishi mumkin – shuning uchun barchasini tekshiramiz!
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL 
-  ssl: { rejectUnauthorized: false }
-});
+const dbUrl = 
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.PGURL ||
+  process.env.DATABASE_PRIVATE_URL ||
+  process.env.POSTGRES_PRISMA_URL?.split("?")[0];   // agar Prisma bo‘lsa
 
-// Agar hali ham yo'q bo'lsa – to'xtatamiz
-if (!pool.options.connectionString) {
-  console.error("DATABASE_URL YO'Q! Bot ishga tushmaydi!");
+if (!dbUrl) {
+  console.error("DATABASE_URL TOPILMADI! Railway Variables ni tekshiring!");
+  console.error("Mavjud environment o‘zgaruvchilari:", Object.keys(process.env).filter(k => k.includes('URL') || k.includes('POSTGRES')));
   process.exit(1);
 }
 
 console.log("DB URL topildi, ulanmoqda...");
 
 const pool = new Pool({
-  connectionString: DATABASE_URL,
+  connectionString: dbUrl,
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false   // Railway uchun majburiy
   }
 });
 
-// Bir marta ulanishni majburan sinash
+// Ulanish hodisalari
+pool.on('connect', () => console.log("RAILWAY POSTGRESGA MUVOFFAQIYATLI ULANILDI"));
+pool.on('error', (err) => console.error("POOL XATOSI:", err.message));
+
+// Bir marta ulanishni sinab ko‘rish (deploy vaqtida darhol xatoni ko‘rish uchun)
 (async () => {
   try {
     const client = await pool.connect();
     console.log("TEST ULANISH MUVOFFAQIYATLI!");
     client.release();
   } catch (err) {
-    console.error("TEST ULANISH XATOLIK:", err.message);
+    console.error("TEST ULANISHDA XATO:", err.message);
     process.exit(1);
   }
 })();
