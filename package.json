@@ -9,13 +9,7 @@
     "dev": "nodemon main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "telegram",
-    "bot",
-    "izolux",
-    "ecommerce",
-    "catalog"
-  ],
+  "keywords": ["telegram", "bot", "izolux", "ecommerce", "catalog"],
   "author": "Izolux Team",
   "license": "MIT",
   "engines": {
@@ -31,8 +25,8 @@
     "nodemon": "^3.1.7"
   },
   "overrides": {
-    "telegraf": {
-      "libatomic1": "override"
+    "pg": {
+      "node-gyp": "override"
     }
   }
 }
