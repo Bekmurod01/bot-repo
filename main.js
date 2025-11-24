@@ -12,11 +12,15 @@ const adminId = Number(process.env.ADMIN_ID);
 // ===================== DATABASE (RAILWAY UCHUN TO'G'RI) =====================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: {
+    rejectUnauthorized: false   // Railway uchun majburiy!
+  }
 });
 
-pool.on("connect", () => console.log("Database ulandi"));
-pool.on("error", (err) => console.error("DB xatosi:", err))
+// Test ulanish
+pool.connect()
+  .then(() => console.log("Database ga ulanildi (Railway)"))
+  .catch(err => console.error("DB ulanish xatosi:", err));
 
 // Database ulanishini tekshirish
 pool.connect()
