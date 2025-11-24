@@ -9,13 +9,38 @@ config();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = Number(process.env.ADMIN_ID);
 
-// ===================== DATABASE (RAILWAY UCHUN TO'G'RI) =====================
+// Railway har xil nom bilan berishi mumkin – shuning uchun barchasini tekshiramiz!
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL 
+  ssl: { rejectUnauthorized: false }
+});
+
+// Agar hali ham yo'q bo'lsa – to'xtatamiz
+if (!pool.options.connectionString) {
+  console.error("DATABASE_URL YO'Q! Bot ishga tushmaydi!");
+  process.exit(1);
+}
+
+console.log("DB URL topildi, ulanmoqda...");
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false   // Railway uchun majburiy!
+    rejectUnauthorized: false
   }
 });
+
+// Bir marta ulanishni majburan sinash
+(async () => {
+  try {
+    const client = await pool.connect();
+    console.log("TEST ULANISH MUVOFFAQIYATLI!");
+    client.release();
+  } catch (err) {
+    console.error("TEST ULANISH XATOLIK:", err.message);
+    process.exit(1);
+  }
+})();
 
 // ===================== JADVAL YARATISH =====================
 async function createTables() {
