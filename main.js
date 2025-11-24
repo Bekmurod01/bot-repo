@@ -25,6 +25,49 @@ pool.connect()
   .then(() => console.log('✅ Database ga muvaffaqiyatli ulanildi'))
   .catch(err => console.error('❌ Database ulanish xatosi:', err));
 
+
+// ====================== CREATE TABLES ======================
+async function createTables() {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      parent_id INTEGER REFERENCES categories(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      category_id INTEGER NOT NULL REFERENCES categories(id),
+      name_uz TEXT NOT NULL,
+      name_ru TEXT NOT NULL,
+      description_uz TEXT,
+      description_ru TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS product_media (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id),
+      file_id TEXT NOT NULL,
+      media_type TEXT NOT NULL,
+      file_size INTEGER,
+      mime_type TEXT,
+      order_index INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  await pool.query(sql);
+  console.log("✅ Tables created (or already exist)");
+}
+
+
+(async () => {
+  await createTables();  // ← AUTO CREATE TABLES
+  console.log("auto created tables...");
+})();
+
+
 // ===================== DATABASE FUNCTIONS =====================
 async function addCategory(name_uz, name_ru, parent_id = null) {
   const query = `
