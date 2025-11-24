@@ -1,44 +1,36 @@
 import { Telegraf, Markup } from "telegraf";
-// import { config } from "dotenv";
-import pkg from "pg";
-// import fetch from 'node-fetch';
+import { config } from "dotenv";
+import { Pool } from "pg";
+import fetch from "node-fetch";
 
-// Environment variables ni yuklash
-// config();
+config();
 
-const { Telegraf } = require('telegraf');
-const { Pool } = require('pg');
-
+// ===================== CONFIG =====================
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const adminId = parseInt(process.env.ADMIN_ID);
+const adminId = Number(process.env.ADMIN_ID);
 
-// PostgreSQL connection for Railway (just replace the old block with this)
+// ===================== DATABASE (RAILWAY UCHUN TO'G'RI) =====================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false   // Required on Railway
-  }
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// Database ulanishini tekshirish
-pool.connect()
-  .then(() => console.log('✅ Database ga muvaffaqiyatli ulanildi'))
-  .catch(err => console.error('❌ Database ulanish xatosi:', err));
+pool.on("connect", () => console.log("Database ulandi"));
+pool.on("error", (err) => console.error("DB xatosi:", err));
 
-
-// ====================== CREATE TABLES ======================
-async function createTables() {
+// ===================== CREATE TABLES =====================
+async function initDB() {
   const sql = `
     CREATE TABLE IF NOT EXISTS categories (
       id SERIAL PRIMARY KEY,
       name_uz TEXT NOT NULL,
       name_ru TEXT NOT NULL,
-      parent_id INTEGER REFERENCES categories(id)
+      parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
-      category_id INTEGER NOT NULL REFERENCES categories(id),
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
       name_uz TEXT NOT NULL,
       name_ru TEXT NOT NULL,
       description_uz TEXT,
@@ -47,9 +39,9 @@ async function createTables() {
 
     CREATE TABLE IF NOT EXISTS product_media (
       id SERIAL PRIMARY KEY,
-      product_id INTEGER NOT NULL REFERENCES products(id),
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
       file_id TEXT NOT NULL,
-      media_type TEXT NOT NULL,
+      media_type TEXT NOT NULL CHECK (media_type IN ('photo', 'video')),
       file_size INTEGER,
       mime_type TEXT,
       order_index INTEGER DEFAULT 0,
@@ -57,15 +49,13 @@ async function createTables() {
     );
   `;
 
-  await pool.query(sql);
-  console.log("✅ Tables created (or already exist)");
+  try {
+    await pool.query(sql);
+    console.log("Jadvallar tayyorlandi");
+  } catch (err) {
+    console.error("Jadval yaratishda xato:", err);
+  }
 }
-
-
-(async () => {
-  await createTables();  // ← AUTO CREATE TABLES
-  console.log("auto created tables...");
-})();
 
 
 // ===================== DATABASE FUNCTIONS =====================
