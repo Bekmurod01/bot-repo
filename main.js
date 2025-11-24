@@ -79,115 +79,294 @@ async function createTables() {
 
 // ===================== DATABASE FUNCTIONS (sizniki – o'zgarmadi) =====================
 async function addCategory(name_uz, name_ru, parent_id = null) {
-  const query = `INSERT INTO categories (name_uz, name_ru, parent_id) VALUES ($1, $2, $3) RETURNING *`;
+  const query = `
+    INSERT INTO categories (name_uz, name_ru, parent_id) 
+    VALUES ($1, $2, $3) 
+    RETURNING *
+  `;
   const result = await pool.query(query, [name_uz, name_ru, parent_id]);
   return result.rows[0];
 }
 
 async function getCategories() {
-  const res = await pool.query("SELECT * FROM categories ORDER BY id DESC");
-  return res.rows;
+  try {
+    const res = await pool.query("SELECT * FROM categories ORDER BY id DESC");
+    return res.rows;
+  } catch (error) {
+    console.error('Kategoriyalarni olishda xato:', error);
+    throw error;
+  }
 }
 
 async function getRootCategories() {
-  const res = await pool.query("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
-  return res.rows;
+  try {
+    const res = await pool.query("SELECT * FROM categories WHERE parent_id IS NULL ORDER BY id DESC");
+    return res.rows;
+  } catch (error) {
+    console.error('Root kategoriyalarni olishda xato:', error);
+    throw error;
+  }
 }
 
 async function getSubCategories(parentId) {
-  const res = await pool.query("SELECT * FROM categories WHERE parent_id = $1 ORDER BY id DESC", [parentId]);
-  return res.rows;
+  try {
+    const res = await pool.query("SELECT * FROM categories WHERE parent_id = $1 ORDER BY id DESC", [parentId]);
+    return res.rows;
+  } catch (error) {
+    console.error('Sub-kategoriyalarni olishda xato:', error);
+    throw error;
+  }
 }
 
 async function getCategoryById(id) {
-  const res = await pool.query("SELECT * FROM categories WHERE id = $1", [id]);
-  return res.rows[0];
+  try {
+    const res = await pool.query("SELECT * FROM categories WHERE id = $1", [id]);
+    return res.rows[0];
+  } catch (error) {
+    console.error('Kategoriyani ID bo\'yicha olishda xato:', error);
+    throw error;
+  }
 }
 
 async function updateCategory(id, newNameUz, newNameRu) {
-  await pool.query("UPDATE categories SET name_uz=$1, name_ru=$2 WHERE id=$3", [newNameUz, newNameRu, id]);
+  try {
+    await pool.query("UPDATE categories SET name_uz=$1, name_ru=$2 WHERE id=$3", [newNameUz, newNameRu, id]);
+  } catch (error) {
+    console.error('Kategoriyani yangilashda xato:', error);
+    throw error;
+  }
 }
 
 async function deleteCategory(id) {
-  const subCategories = await getSubCategories(id);
-  for (const subCat of subCategories) await deleteCategory(subCat.id);
-  await pool.query("DELETE FROM products WHERE category_id=$1", [id]);
-  await pool.query("DELETE FROM categories WHERE id=$1", [id]);
+  try {
+    // Subcategoriyalarni va ularning mahsulotlarini ham o'chirish
+    const subCategories = await getSubCategories(id);
+    for (const subCat of subCategories) {
+      await deleteCategory(subCat.id);
+    }
+
+    // Bu kategoriyadagi mahsulotlarni o'chirish
+    await pool.query("DELETE FROM products WHERE category_id=$1", [id]);
+
+    // Kategoriyani o'chirish
+    await pool.query("DELETE FROM categories WHERE id=$1", [id]);
+  } catch (error) {
+    console.error('Kategoriyani o\'chirishda xato:', error);
+    throw error;
+  }
 }
 
 async function addProduct(categoryId, nameUz, nameRu, descriptionUz, descriptionRu) {
-  const res = await pool.query(
-    "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-    [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
-  );
-  return res.rows[0];
+  try {
+    const res = await pool.query(
+      "INSERT INTO products (category_id, name_uz, name_ru, description_uz, description_ru) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [categoryId, nameUz, nameRu, descriptionUz, descriptionRu]
+    );
+    return res.rows[0];
+  } catch (error) {
+    console.error('Mahsulot qo\'shishda xato:', error);
+    throw error;
+  }
 }
 
 async function getProductsByCategory(categoryId) {
-  const res = await pool.query("SELECT * FROM products WHERE category_id = $1 ORDER BY id DESC", [categoryId]);
-  return res.rows;
+  try {
+    const res = await pool.query(
+      "SELECT * FROM products WHERE category_id = $1 ORDER BY id DESC",
+      [categoryId]
+    );
+    return res.rows;
+  } catch (error) {
+    console.error('Mahsulotlarni olishda xato:', error);
+    throw error;
+  }
 }
 
 async function getProductById(id) {
-  const res = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
-  return res.rows[0];
+  try {
+    const res = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+    return res.rows[0];
+  } catch (error) {
+    console.error('Mahsulotni ID bo\'yicha olishda xato:', error);
+    throw error;
+  }
 }
 
 async function updateProduct(id, nameUz, nameRu, descriptionUz, descriptionRu) {
-  await pool.query("UPDATE products SET name_uz=$1, name_ru=$2, description_uz=$3, description_ru=$4 WHERE id=$5",
-    [nameUz, nameRu, descriptionUz, descriptionRu, id]);
+  try {
+    await pool.query("UPDATE products SET name_uz=$1, name_ru=$2, description_uz=$3, description_ru=$4 WHERE id=$5",
+      [nameUz, nameRu, descriptionUz, descriptionRu, id]);
+  } catch (error) {
+    console.error('Mahsulotni yangilashda xato:', error);
+    throw error;
+  }
 }
 
 async function deleteProduct(id) {
-  await pool.query("DELETE FROM product_media WHERE product_id = $1", [id]);
-  await pool.query("DELETE FROM products WHERE id=$1", [id]);
+  try {
+    await deleteProductMedia(id);
+    await pool.query("DELETE FROM products WHERE id=$1", [id]);
+  } catch (error) {
+    console.error('Mahsulotni o\'chirishda xato:', error);
+    throw error;
+  }
 }
 
 async function addProductMedia(productId, fileId, mediaType, fileSize = null, mimeType = null, orderIndex = 0) {
-  const res = await pool.query(
-    "INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-    [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
-  );
-  return res.rows[0];
+  try {
+    const res = await pool.query(
+      "INSERT INTO product_media (product_id, file_id, media_type, file_size, mime_type, order_index) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [productId, fileId, mediaType, fileSize, mimeType, orderIndex]
+    );
+    return res.rows[0];
+  } catch (error) {
+    console.error('Media qo\'shishda xato:', error);
+    throw error;
+  }
 }
 
 async function getProductMedia(productId) {
-  const res = await pool.query("SELECT * FROM product_media WHERE product_id = $1 ORDER BY order_index ASC, created_at ASC", [productId]);
-  return res.rows;
+  try {
+    const res = await pool.query(
+      "SELECT * FROM product_media WHERE product_id = $1 ORDER BY order_index ASC, created_at ASC",
+      [productId]
+    );
+    return res.rows;
+  } catch (error) {
+    console.error('Media olishda xato:', error);
+    throw error;
+  }
 }
 
-// ===================== QOLGAN KOD (sizniki – 100% o'zgarmadi) =====================
+async function deleteProductMedia(productId) {
+  try {
+    await pool.query("DELETE FROM product_media WHERE product_id = $1", [productId]);
+  } catch (error) {
+    console.error('Media o\'chirishda xato:', error);
+    throw error;
+  }
+}
+
+// ===================== GLOBAL VARIABLES =====================
 const userLang = {};
 const session = {};
 const userCurrentMenu = {};
 
-function setCurrentMenu(chatId, menuType) { userCurrentMenu[chatId] = menuType; }
-function getCurrentMenu(chatId) { return userCurrentMenu[chatId] || 'main'; }
-function isAdmin(userId) { return parseInt(userId) === adminId; }
+function setCurrentMenu(chatId, menuType) {
+  userCurrentMenu[chatId] = menuType;
+}
 
+function getCurrentMenu(chatId) {
+  return userCurrentMenu[chatId] || 'main';
+}
+
+function isAdmin(userId) {
+  return parseInt(userId) === adminId;
+}
+
+// ===================== TEXT FUNCTIONS =====================
 function getText(lang, key) {
-  const texts = { /* sizning barcha textlaringiz bu yerda qoldi – joy tufayli qisqartirdim */ 
-    choose_language: { uz: "Tilni tanlang:", ru: "Выберите язык:" },
-    language_selected: { uz: "O'zbek tili tanlandi", ru: "Русский язык выбран" },
-    admin_panel: { uz: "Admin paneli:", ru: "Панель администратора:" },
-    not_admin: { uz: "Siz admin emassiz!", ru: "Вы не администратор!" },
-    main_menu: { uz: "Asosiy menyu:", ru: "Главное меню:" },
-    company_info: { uz: "IZOLUX KOMPANIYASI HAQIDA\n\nManzi...: +998 88 980 60 09\nAdmin: @Muzropov_Dilmurod\n\nYuqori sifatli izolyatsiya materiallari.", ru: "О КОМПАНИИ IZOLUX\n\nТелефон: +998 88 980 60 09\nAdmin: @Muzropov_Dilmurod\n\nВысококачественные изоляционные материалы." },
-    contact_info: { uz: "ALOQA\n\nAdmin: Dilmurod\n+998 88 980 60 09\n@Muzropov_Dilmurod", ru: "КОНТАКТЫ\n\nAdmin: Dilmurod\n+998 88 980 60 09\n@Muzropov_Dilmurod" },
-    add_category: { uz: "Kategoriya qo'shish", ru: "Добавить категорию" },
-    add_subcategory: { uz: "Bo'lim qo'shish", ru: "Добавить подкатегорию" },
-    add_product: { uz: "Mahsulot qo'shish", ru: "Добавить товар" },
-    edit_menu: { uz: "Tahrirlash", ru: "Редактировать" },
-    delete_menu: { uz: "O'chirish", ru: "Удалить" },
-    back: { uz: "Orqaga", ru: "Назад" },
-    catalog: { uz: "Katalog", ru: "Каталог" },
-    info: { uz: "Ma'lumot", ru: "О компании" },
-    contact: { uz: "Aloqa", ru: "Контакты" },
-    category_saved: { uz: "Kategoriya saqlandi!", ru: "Категория сохранена!" },
-    product_saved: { uz: "Mahsulot saqlandi!", ru: "Товар сохранен!" },
-    no_categories: { uz: "Kategoriyalar yo'q", ru: "Категории не найдены" },
-    no_products: { uz: "Mahsulotlar yo'q", ru: "Товаров нет" }
+  const texts = {
+    choose_language: {
+      uz: "🌐 Tilni tanlang:",
+      ru: "🌐 Выберите язык:"
+    },
+    language_selected: {
+      uz: "✅ O'zbek tili tanlandi",
+      ru: "✅ Русский язык выбран"
+    },
+    admin_panel: {
+      uz: "👨‍💼 Admin paneli:",
+      ru: "👨‍💼 Панель администратора:"
+    },
+    not_admin: {
+      uz: "❌ Siz admin emassiz!",
+      ru: "❌ Вы не администратор!"
+    },
+    main_menu: {
+      uz: "🏠 Asosiy menyu:",
+      ru: "🏠 Главное меню:"
+    },
+    company_info: {
+      uz: "🏢 IZOLUX KOMPANIYASI HAQIDA\n\n📍 Manzil: Toshkent shahar\n📞 Telefon: +998 88 980 60 09\n📞 Admin: @Muzropov_Dilmurod\n\n✨ Bizning kompaniya yuqori sifatli izolyatsiya materiallari bilan ta'minlaydi.",
+      ru: "🏢 О КОМПАНИИ IZOLUX\n\n📍 Адрес: г. Ташкент\n📞 Телефон: +998 88 980 60 09\n📞 Admin: @Muzropov_Dilmurod\n\n✨ Наша компания обеспечивает высококачественными изоляционными материалами."
+    },
+    contact_info: {
+      uz: "📞 ALOQA MA'LUMOTLARI\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Manzil: Toshkent shahar\n🕒 Ish vaqti: 9:00 - 18:00\n\n💬 Telegram: @Muzropov_Dilmurod",
+      ru: "📞 КОНТАКТНАЯ ИНФОРМАЦИЯ\n\n👤 Admin: Dilmurod\n📱 Telefon: +998 88 980 60 09\n📍 Адрес: г. Ташкент\n🕒 Время работы: 9:00 - 18:00\n\n💬 Telegram: @Muzropov_Dilmurod"
+    },
+    // Admin buttons
+    add_category: { uz: "➕ Kategoriya qo'shish", ru: "➕ Добавить категорию" },
+    add_subcategory: { uz: "📂 Bo'lim qo'shish", ru: "📂 Добавить подкатегорию" },
+    add_product: { uz: "🛍 Mahsulot qo'shish", ru: "🛍 Добавить товар" },
+    edit_menu: { uz: "✏️ Tahrirlash", ru: "✏️ Редактировать" },
+    delete_menu: { uz: "🗑 O'chirish", ru: "🗑 Удалить" },
+    back: { uz: "🔙 Orqaga", ru: "🔙 Назад" },
+
+    // Edit menu
+    edit_category: { uz: "📁 Kategoriya tahrirlash", ru: "📁 Редактировать категорию" },
+    edit_subcategory: { uz: "📂 Bo'lim tahrirlash", ru: "📂 Редактировать подкатегорию" },
+    edit_product: { uz: "📝 Mahsulot tahrirlash", ru: "📝 Редактировать товар" },
+    edit_product_details: { uz: "🏷 Ma'lumot tahrirlash", ru: "🏷 Редактировать информацию" },
+    edit_product_media: { uz: "🖼 Rasm tahrirlash", ru: "🖼 Редактировать фото" },
+
+    // Delete menu
+    delete_category: { uz: "🗑 Kategoriya o'chirish", ru: "🗑 Удалить категорию" },
+    delete_subcategory: { uz: "🗑 Bo'lim o'chirish", ru: "🗑 Удалить подкатегорию" },
+    delete_product: { uz: "🗑 Mahsulot o'chirish", ru: "🗑 Удалить товар" },
+
+    // Product edit submenu
+    edit_product_name: { uz: "📝 Nom tahrirlash", ru: "📝 Редактировать название" },
+    edit_product_description: { uz: "📋 Tavsif tahrirlash", ru: "📋 Редактировать описание" },
+
+    // Input prompts
+    enter_category_name_uz: { uz: "📁 Kategoriya nomini o'zbekcha kiriting:", ru: "📁 Введите название категории на узбекском:" },
+    enter_category_name_ru: { uz: "📁 Kategoriya nomini ruscha kiriting:", ru: "📁 Введите название категории на русском:" },
+    enter_subcategory_name_uz: { uz: "📂 Bo'lim nomini o'zbekcha kiriting:", ru: "📂 Введите название подкатегории на узбекском:" },
+    enter_subcategory_name_ru: { uz: "📂 Bo'lim nomini ruscha kiriting:", ru: "📂 Введите название подкатегории на русском:" },
+    enter_product_name_uz: { uz: "🏷 Mahsulot nomini o'zbekcha kiriting:", ru: "🏷 Введите название товара на узбекском:" },
+    enter_product_name_ru: { uz: "🏷 Mahsulot nomini ruscha kiriting:", ru: "🏷 Введите название товара на русском:" },
+    enter_product_description_uz: { uz: "📝 Mahsulot tavsifini o'zbekcha kiriting:", ru: "📝 Введите описание товара на узбекском:" },
+    enter_product_description_ru: { uz: "📝 Mahsulot tavsifini ruscha kiriting:", ru: "📝 Введите описание товара на русском:" },
+
+    // New names for editing
+    enter_new_name_uz: { uz: "✏️ Yangi nomni o'zbekcha kiriting:", ru: "✏️ Введите новое название на узбекском:" },
+    enter_new_name_ru: { uz: "✏️ Yangi nomni ruscha kiriting:", ru: "✏️ Введите новое название на русском:" },
+    enter_new_description_uz: { uz: "✏️ Yangi tavsifni o'zbekcha kiriting:", ru: "✏️ Введите новое описание на узбекском:" },
+    enter_new_description_ru: { uz: "✏️ Yangi tavsifni ruscha kiriting:", ru: "✏️ Введите новое описание на русском:" },
+
+    // Media
+    send_multiple_media: { uz: "📷📹 Mahsulot rasmlari va videolarini yuboring.\nTugagach 'Tayyor' tugmasini bosing:", ru: "📷📹 Отправьте фото и видео товара.\nПо завершении нажмите 'Готово':" },
+
+    // Messages
+    category_saved: { uz: "✅ Kategoriya saqlandi!", ru: "✅ Категория сохранена!" },
+    subcategory_saved: { uz: "✅ Bo'lim saqlandi!", ru: "✅ Подкатегория сохранена!" },
+    product_saved: { uz: "✅ Mahsulot saqlandi!", ru: "✅ Товар сохранен!" },
+    category_updated: { uz: "✅ Kategoriya yangilandi!", ru: "✅ Категория обновлена!" },
+    subcategory_updated: { uz: "✅ Bo'lim yangilandi!", ru: "✅ Подкатегория обновлена!" },
+    product_updated: { uz: "✅ Mahsulot yangilandi!", ru: "✅ Товар обновлен!" },
+    media_updated: { uz: "✅ Rasm yangilandi!", ru: "✅ Фото обновлено!" },
+    category_deleted: { uz: "✅ Kategoriya o'chirildi!", ru: "✅ Категория удалена!" },
+    subcategory_deleted: { uz: "✅ Bo'lim o'chirildi!", ru: "✅ Подкатегория удалена!" },
+    product_deleted: { uz: "✅ Mahsulot o'chirildi!", ru: "✅ Товар удален!" },
+
+    // Selections
+    select_category: { uz: "📂 Kategoriyani tanlang:", ru: "📂 Выберите категорию:" },
+    select_subcategory: { uz: "📂 Bo'limni tanlang:", ru: "📂 Выберите подкатегорию:" },
+    select_product: { uz: "🛍 Mahsulotni tanlang:", ru: "🛍 Выберите товар:" },
+    select_edit_option: { uz: "✏️ Nimani tahrirlaysiz?", ru: "✏️ Что будете редактировать?" },
+
+    // No items messages
+    no_categories: { uz: "🚫 Kategoriyalar topilmadi", ru: "🚫 Категории не найдены" },
+    no_subcategories: { uz: "🚫 Bo'limlar topilmadi", ru: "🚫 Подкатегории не найдены" },
+    no_products: { uz: "🚫 Bu bo'limda mahsulotlar yo'q", ru: "🚫 В этой подкатегории нет товаров" },
+
+    // Menu items
+    catalog: { uz: "🛒 Katalog", ru: "🛒 Каталог" },
+    info: { uz: "ℹ️ Ma'lumot", ru: "ℹ️ О компании" },
+    contact: { uz: "📞 Aloqa", ru: "📞 Контакты" }
   };
+
   return texts[key] ? texts[key][lang] || texts[key]['uz'] : key;
 }
 
