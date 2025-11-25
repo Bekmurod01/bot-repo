@@ -20,13 +20,10 @@ const adminId = Number(process.env.ADMIN_ID) || 0;
 
 // ===================== DATABASE CONNECTION (RAILWAY 2025) =====================
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL + "?sslmode=no-verify",
   ssl: {
     rejectUnauthorized: false
-  },
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  }
 });
 
 pool.on("connect", () => console.log("PostgreSQL ga ulanildi"));
@@ -1515,9 +1512,9 @@ bot.on("text", async (ctx) => {
 
 setInterval(async () => {
   try {
-    await pool.query("SELECT 1"); // eng oddiy query
-    console.log("DB ping → online saqlandi:", new Date().toISOString());
-  } catch (err) {
-    console.error("DB ping xato:", err.message);
+    await pool.query("SELECT 1");
+    console.log("DB ping → online:", new Date().toLocaleTimeString());
+  } catch (e) {
+    console.log("DB ping failed, reconnecting...");
   }
-}, 10 * 60 * 1000);
+}, 8 * 60 * 1000);
