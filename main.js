@@ -20,10 +20,19 @@ const adminId = Number(process.env.ADMIN_ID) || 0;
 
 // ===================== DATABASE CONNECTION (RAILWAY 2025) =====================
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL + "?sslmode=no-verify",
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },  // Railway uchun majburiy
+  max: 10,  // Maksimal ulanishlar soni
+  idleTimeoutMillis: 50 * 60 * 1000,  // 50 daqiqada idle ulanishlarni yoping (Railway 60 daqiqadan oldin)
+  connectionTimeoutMillis: 10000,  // 10 soniyada ulanish timeout
+  allowExitOnIdle: false  // Pool o‘chib ketmasin
+});
+
+// Pool error handler (Unhandled error ni tuting)
+pool.on('error', (err, client) => {
+  console.error('Pool xatosi (idle timeout):', err.message);
+  // Avtomatik qayta ulanish
+  client.release(err);
 });
 
 pool.on("connect", () => console.log("PostgreSQL ga ulanildi"));
@@ -1512,9 +1521,14 @@ bot.on("text", async (ctx) => {
 
 setInterval(async () => {
   try {
-    await pool.query("SELECT 1");
-    console.log("DB ping → online:", new Date().toLocaleTimeString());
-  } catch (e) {
-    console.log("DB ping failed, reconnecting...");
+    await pool.query('SELECT 1');
+    console.log('DB ping muvaffaqiyatli → online saqlandi:', new Date().toLocaleTimeString());
+  } catch (err) {
+    console.error('DB ping xatosi, qayta ulanmoqda:', err.message);
+    // Pool ni qayta yaratish (zaxira)
+    pool.end().then(() => {
+      // Pool ni qayta ishga tushiring
+      process.exit(1);  // Railway avtomatik restart qiladi
+    });
   }
-}, 8 * 60 * 1000);
+}, 50 * 60 * 1000);
