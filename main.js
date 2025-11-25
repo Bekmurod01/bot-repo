@@ -1512,3 +1512,12 @@ bot.on("text", async (ctx) => {
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
 })();
+
+setInterval(async () => {
+  try {
+    await pool.query("SELECT 1"); // eng oddiy query
+    console.log("DB ping → online saqlandi:", new Date().toISOString());
+  } catch (err) {
+    console.error("DB ping xato:", err.message);
+  }
+}, 10 * 60 * 1000);
