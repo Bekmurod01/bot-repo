@@ -21,12 +21,29 @@ const adminId = Number(process.env.ADMIN_ID) || 0;
 // ===================== DATABASE CONNECTION (RAILWAY 2025) =====================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },  // Railway uchun majburiy
-  max: 10,  // Maksimal ulanishlar soni
-  idleTimeoutMillis: 50 * 60 * 1000,  // 50 daqiqada idle ulanishlarni yoping (Railway 60 daqiqadan oldin)
-  connectionTimeoutMillis: 10000,  // 10 soniyada ulanish timeout
-  allowExitOnIdle: false  // Pool o‘chib ketmasin
+  ssl: { rejectUnauthorized: false },
+  
+  // Eng muhim sozlamalar
+  max: 8,                         // Ko‘p bo‘lsa Railway kill qiladi
+  idleTimeoutMillis: 30_000,      // 30 soniya (Railway 60 daqiqa oldin yopadi)
+  connectionTimeoutMillis: 10_000,
+  allowExitOnIdle: false,
 });
+
+// "Double release" va "terminated unexpectedly" xatolarini to‘liq yo‘q qilish
+pool.on('error', (err) => {
+  console.error('Pool xatosi (idle/connection):', err.message);
+  // Hech narsa qilmaymiz — pool avtomatik yangi ulanish ochadi
+});
+
+pool.on('connect', () => {
+  console.log('Yangi DB ulanish ochildi');
+});
+
+pool.on('remove', () => {
+  console.log('Eski DB ulanish yopildi');
+});
+
 
 // Pool error handler (Unhandled error ni tuting)
 pool.on('error', (err, client) => {
@@ -1522,13 +1539,8 @@ bot.on("text", async (ctx) => {
 setInterval(async () => {
   try {
     await pool.query('SELECT 1');
-    console.log('DB ping muvaffaqiyatli → online saqlandi:', new Date().toLocaleTimeString());
+    console.log('DB ping → online saqlandi', new Date().toLocaleTimeString());
   } catch (err) {
-    console.error('DB ping xatosi, qayta ulanmoqda:', err.message);
-    // Pool ni qayta yaratish (zaxira)
-    pool.end().then(() => {
-      // Pool ni qayta ishga tushiring
-      process.exit(1);  // Railway avtomatik restart qiladi
-    });
+    console.error('DB ping xatosi:', err.message);
   }
-}, 50 * 60 * 1000);
+}, 25 * 60 * 1000); // 25 daqiqa
