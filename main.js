@@ -5,55 +5,60 @@ import fetch from "node-fetch";
 
 config();
 
-// ===================== MUST HAVE VARIABLES (RAILWAY) =====================
+// ===================== MUST HAVE VARIABLES =====================
 if (!process.env.BOT_TOKEN) {
-  console.error("BOT_TOKEN topilmadi! Railway Variables ga qo'shing!");
+  console.error("BOT_TOKEN topilmadi!");
   process.exit(1);
 }
 if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL topilmadi! Bot service → Variables → Add Reference → {{Postgres.DATABASE_URL}}");
+  console.error("DATABASE_URL topilmadi!");
   process.exit(1);
 }
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const adminId = Number(process.env.ADMIN_ID) || 0;
 
-// ===================== DATABASE CONNECTION (RAILWAY 2025) =====================
+// ======================= FIXED DATABASE CONNECTION =======================
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  
-  // Eng muhim sozlamalar
-  max: 8,                         // Ko‘p bo‘lsa Railway kill qiladi
-  idleTimeoutMillis: 30_000,      // 30 soniya (Railway 60 daqiqa oldin yopadi)
+
+  // Railway recommended minimal pool
+  max: 5,
+  idleTimeoutMillis: 20_000,
   connectionTimeoutMillis: 10_000,
-  allowExitOnIdle: false,
 });
 
-// "Double release" va "terminated unexpectedly" xatolarini to‘liq yo‘q qilish
-pool.on('error', (err) => {
-  console.error('Pool xatosi (idle/connection):', err.message);
-  // Hech narsa qilmaymiz — pool avtomatik yangi ulanish ochadi
+// ———————————————— Pool-safe Query (prevents crashes) ————————————————
+export async function dbQuery(sql, params = []) {
+  try {
+    return await pool.query(sql, params);
+  } catch (err) {
+    console.error("DB QUERY ERROR:", err.message);
+    throw err;
+  }
+}
+
+// —————————————— Error Handlers (prevents bot from crashing) ——————————————
+pool.on("error", (err) => {
+  console.error("Unexpected PG error:", err.message);
+  // Never exit — just log
 });
 
-pool.on('connect', () => {
-  console.log('Yangi DB ulanish ochildi');
+pool.on("connect", () => {
+  console.log("PostgreSQL: new connection opened");
 });
 
-pool.on('remove', () => {
-  console.log('Eski DB ulanish yopildi');
-});
-
-
-// Pool error handler (Unhandled error ni tuting)
-pool.on('error', (err, client) => {
-  console.error('Pool xatosi (idle timeout):', err.message);
-  // Avtomatik qayta ulanish
-  client.release(err);
-});
-
-pool.on("connect", () => console.log("PostgreSQL ga ulanildi"));
-pool.on("error", (err) => console.error("DB xatosi:", err));
+// ———————————————— Keep-Alive (prevents railway sleep kills) ————————————————
+setInterval(async () => {
+  try {
+    await pool.query("SELECT 1");
+    console.log("Keep-alive ping");
+  } catch (err) {
+    console.error("Keep-alive failed:", err.message);
+  }
+}, 5 * 60 * 1000);
 
 // ===================== CREATE TABLES (bir marta ishlaydi) =====================
 async function createTables() {
@@ -1535,12 +1540,3 @@ bot.on("text", async (ctx) => {
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
 })();
-
-setInterval(async () => {
-  try {
-    await pool.query('SELECT 1');
-    console.log('DB ping → online saqlandi', new Date().toLocaleTimeString());
-  } catch (err) {
-    console.error('DB ping xatosi:', err.message);
-  }
-}, 25 * 60 * 1000); // 25 daqiqa
